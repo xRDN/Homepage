@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { Player } from './player.js';
 import { triggerAtmosphereSwell } from './audio.js';
 
-let engineState = 'INTRO'; // INTRO -> SELECT -> WARPING -> INTERACTIVE
+let engineState = 'INTRO'; 
 let selectedChar = 'slime';
 
 // --- UI EVENT LISTENERS ---
@@ -17,7 +17,6 @@ document.getElementById('btn-start').addEventListener('pointerdown', () => {
   introScreen.classList.add('hidden');
   selectScreen.classList.add('visible');
   
-  // Instantiate player on the elevated showcase platform
   localPlayer = new Player('local_' + Math.floor(Math.random() * 1000), scene, uiLayer, true, selectedChar);
   localPlayer.mesh.position.set(0, 15, 0);
   players.set(localPlayer.id, localPlayer);
@@ -38,7 +37,6 @@ document.getElementById('btn-deploy').addEventListener('pointerdown', () => {
   selectScreen.classList.remove('visible');
   triggerAtmosphereSwell();
 
-  // Reset showcase transformations and drop to the floor
   localPlayer.core.scale.set(1, 1, 1);
   localPlayer.mesh.rotation.y = 0;
   localPlayer.mesh.position.set(0, 0, 0);
@@ -65,6 +63,9 @@ const bunkerGroup = new THREE.Group();
 scene.add(bunkerGroup);
 
 const concreteMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.8, metalness: 0.1 });
+const darkMetal = new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.4, metalness: 0.7 });
+const cardboardMat = new THREE.MeshStandardMaterial({ color: 0xeab308, roughness: 0.9 });
+
 const floor = new THREE.Mesh(new THREE.PlaneGeometry(80, 80), concreteMat);
 floor.rotation.x = -Math.PI / 2;
 bunkerGroup.add(floor);
@@ -76,7 +77,6 @@ const wallE = new THREE.Mesh(wallGeo, concreteMat); wallE.position.set(40, 7.5, 
 const wallW = new THREE.Mesh(wallGeo, concreteMat); wallW.position.set(-40, 7.5, 0); wallW.rotation.y = Math.PI / 2;
 bunkerGroup.add(wallN, wallS, wallE, wallW);
 
-// Elevated Showcase Platform (For Character Select State)
 const showcasePlatform = new THREE.Mesh(
   new THREE.CylinderGeometry(2, 2.5, 0.5, 64),
   new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.2, metalness: 0.8 })
@@ -89,12 +89,86 @@ showcaseLight.position.set(0, 22, 0);
 showcaseLight.target = showcasePlatform;
 bunkerGroup.add(showcaseLight);
 
-// Global Lighting
 scene.add(new THREE.AmbientLight(0xffffff, 2.5));
 scene.add(new THREE.HemisphereLight(0xffffff, 0xe2e8f0, 2.0));
 const sunLight = new THREE.DirectionalLight(0xfffbeb, 3.0);
 sunLight.position.set(20, 30, 20);
 scene.add(sunLight);
+
+// --- 3D INTERACTIVE SOCIAL RELICS ---
+const textureLoader = new THREE.TextureLoader();
+const linkItems = [];
+
+const cardboard = new THREE.Mesh(new THREE.BoxGeometry(6, 3, 2), cardboardMat);
+cardboard.position.set(0, 1.5, -12);
+cardboard.rotation.y = -0.15;
+bunkerGroup.add(cardboard);
+
+function createIconPanel(textureUrl, url, xOffset, color) {
+  const material = new THREE.MeshStandardMaterial({
+    map: textureLoader.load(textureUrl),
+    transparent: true,
+    side: THREE.DoubleSide,
+    emissive: color,
+    emissiveIntensity: 0.1, 
+    roughness: 0.2
+  });
+  
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 1.5), material);
+  mesh.userData = { url: url, baseY: 4.5, color: color };
+  mesh.position.set(xOffset, 4.5, -12);
+  
+  const backplate = new THREE.Mesh(
+    new THREE.CircleGeometry(1.0, 32),
+    new THREE.MeshBasicMaterial({ color: color, transparent: true, opacity: 0.15 })
+  );
+  backplate.position.z = -0.05; 
+  mesh.add(backplate);
+
+  bunkerGroup.add(mesh);
+  linkItems.push(mesh);
+}
+
+createIconPanel('https://cdn-icons-png.flaticon.com/512/174/174857.png', 'https://linkedin.com', -2.5, 0x0a66c2);
+createIconPanel('https://cdn-icons-png.flaticon.com/512/25/25231.png', 'https://github.com', 0, 0x000000);
+createIconPanel('https://cdn-icons-png.flaticon.com/512/5969/5969020.png', 'https://x.com', 2.5, 0x000000);
+
+// --- RAYCASTING (HOVER & CLICK 3D ICONS) ---
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+let hoveredMesh = null;
+
+canvas.addEventListener('pointermove', (e) => {
+  if (engineState !== 'INTERACTIVE') return;
+  mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+  mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+  raycaster.setFromCamera(mouse, camera);
+  const intersects = raycaster.intersectObjects(linkItems);
+
+  if (intersects.length > 0) {
+    const object = intersects[0].object;
+    if (hoveredMesh !== object) {
+      if (hoveredMesh) resetHover(hoveredMesh);
+      hoveredMesh = object;
+      document.body.style.cursor = 'pointer';
+      hoveredMesh.material.emissiveIntensity = 1.0; 
+      hoveredMesh.scale.set(1.15, 1.15, 1.15);       
+      hoveredMesh.children[0].material.opacity = 0.4;
+    }
+  } else {
+    if (hoveredMesh) {
+      resetHover(hoveredMesh);
+      hoveredMesh = null;
+      document.body.style.cursor = 'default';
+    }
+  }
+});
+
+function resetHover(mesh) {
+  mesh.material.emissiveIntensity = 0.1;
+  mesh.scale.set(1, 1, 1);
+  mesh.children[0].material.opacity = 0.15;
+}
 
 // --- MOBILE UI INJECTION ---
 const mobileJumpBtn = document.createElement('div');
@@ -154,11 +228,27 @@ window.addEventListener('pointerup', () => {
   joystickKnob.style.transform = `translate(0px, 0px)`;
 });
 
-// Free-Look Camera Drag
+// Free-Look Camera Drag (AND Raycaster Click fallback)
 let camYaw = Math.PI, camPitch = 0.5, camDistance = 8, isDraggingCam = false;
 const camZone = document.getElementById('camera-zone');
+
 camZone.addEventListener('pointerdown', () => isDraggingCam = true);
-canvas.addEventListener('pointerdown', () => isDraggingCam = true);
+canvas.addEventListener('pointerdown', (e) => {
+  if (engineState !== 'INTERACTIVE') return;
+
+  // First, check if we clicked a social icon
+  mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+  mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+  raycaster.setFromCamera(mouse, camera);
+  const intersects = raycaster.intersectObjects(linkItems);
+
+  if (intersects.length > 0) {
+    window.open(intersects[0].object.userData.url, '_blank');
+  } else {
+    // If we missed the icons, start dragging the camera
+    isDraggingCam = true;
+  }
+});
 window.addEventListener('pointerup', () => isDraggingCam = false);
 window.addEventListener('pointermove', (e) => {
   if (!isDraggingCam || engineState !== 'INTERACTIVE') return;
@@ -172,6 +262,18 @@ document.getElementById('chat-send').addEventListener('click', () => {
   if (chatInput.value.trim()) { localPlayer.say(chatInput.value.trim()); chatInput.value = ''; }
 });
 chatInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') document.getElementById('chat-send').click(); });
+
+// Network Simulator
+function spawnNetworkEvent() {
+  const remoteId = 'remote_' + Math.floor(Math.random() * 9000);
+  const remotePlayer = new Player(remoteId, scene, uiLayer, false, 'mecha');
+  remotePlayer.mesh.position.set(-8, 0, -5);
+  remotePlayer.targetPos.set(-8, 0, -5);
+  players.set(remoteId, remotePlayer);
+
+  setTimeout(() => remotePlayer.say('Nice avatar selection.'), 1000);
+  setTimeout(() => remotePlayer.targetPos.set(0, 0, -8), 3500); 
+}
 
 // --- RENDER PIPELINE ---
 window.addEventListener('resize', () => {
@@ -203,9 +305,11 @@ function animate() {
       chatInterface.classList.add('hud-element', 'unlocked');
       mobileJumpBtn.classList.add('unlocked');
       joystickZone.classList.add('unlocked');
+      setTimeout(spawnNetworkEvent, 1500);
     }
   } 
   else if (engineState === 'INTERACTIVE') {
+    // Kinematics Math
     let inputX = joyDelta.x, inputY = joyDelta.y; 
     if (keys.a) inputX = -1; if (keys.d) inputX = 1;
     if (keys.w) inputY = -1; if (keys.s) inputY = 1;
@@ -230,6 +334,12 @@ function animate() {
     camera.lookAt(localPlayer.mesh.position.x, localPlayer.mesh.position.y + 1.0, localPlayer.mesh.position.z);
     
     localPlayer.updateAnimation(time, isMoving);
+
+    // Make social relics always face the camera
+    linkItems.forEach((relic, i) => {
+      relic.lookAt(camera.position);
+      relic.position.y = relic.userData.baseY + Math.sin(time * 2 + i) * 0.15;
+    });
   }
 
   players.forEach((player) => {
