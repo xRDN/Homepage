@@ -95,25 +95,115 @@ const proj2Holo = new THREE.Mesh(
 proj2Holo.position.set(18, 3.5, -10);
 bunkerGroup.add(proj2Base, proj2Holo);
 
-const cardboard = new THREE.Mesh(new THREE.BoxGeometry(4, 5, 1), cardboardMat);
-cardboard.position.set(0, 2.5, -12);
+// Cardboard Display Stand
+const cardboard = new THREE.Mesh(new THREE.BoxGeometry(6, 3, 2), cardboardMat);
+cardboard.position.set(0, 1.5, -12);
 cardboard.rotation.y = -0.15;
-cardboard.rotation.z = 0.05;
 bunkerGroup.add(cardboard);
+
+// --- NEW: 3D INTERACTIVE SOCIAL RELICS ---
+const linkItems = [];
+
+function createSocialRelic(geometry, color, url, xOffset) {
+  const material = new THREE.MeshStandardMaterial({
+    color: color,
+    emissive: color,
+    emissiveIntensity: 0.4,
+    roughness: 0.2,
+    metalness: 0.8
+  });
+  
+  const mesh = new THREE.Mesh(geometry, material);
+  
+  // Attach metadata for the raycaster
+  mesh.userData = { 
+    url: url, 
+    baseY: 4.0, // Floating height
+    hovered: false 
+  };
+  
+  // Position above the cardboard stand
+  mesh.position.set(xOffset, 4.0, -12);
+  
+  // Add a protective holographic ring
+  const ringGeo = new THREE.TorusGeometry(0.7, 0.03, 16, 32);
+  const ringMat = new THREE.MeshBasicMaterial({ color: color, transparent: true, opacity: 0.5 });
+  const ring = new THREE.Mesh(ringGeo, ringMat);
+  ring.rotation.x = Math.PI / 2;
+  mesh.add(ring);
+
+  bunkerGroup.add(mesh);
+  linkItems.push(mesh);
+  return mesh;
+}
+
+// 1. LinkedIn (Blue Cube)
+createSocialRelic(new THREE.BoxGeometry(0.7, 0.7, 0.7), 0x0a66c2, 'https://linkedin.com', -2.5);
+
+// 2. GitHub (Dark Sphere)
+createSocialRelic(new THREE.SphereGeometry(0.45, 32, 32), 0x24292e, 'https://github.com', 0);
+
+// 3. X.com (Black Diamond/Octahedron)
+createSocialRelic(new THREE.OctahedronGeometry(0.5, 0), 0x000000, 'https://x.com', 2.5);
+
+// --- RAYCASTING (3D CLICK DETECTION) ---
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+let hoveredMesh = null;
+
+// Handle Hover Effects (Desktop)
+canvas.addEventListener('pointermove', (e) => {
+  if (engineState !== 'INTERACTIVE') return;
+
+  // Convert mouse position to normalized device coordinates (-1 to +1)
+  mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+  mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+
+  raycaster.setFromCamera(mouse, camera);
+  const intersects = raycaster.intersectObjects(linkItems);
+
+  if (intersects.length > 0) {
+    const object = intersects[0].object;
+    if (hoveredMesh !== object) {
+      // Revert previous hover
+      if (hoveredMesh) resetHover(hoveredMesh);
+      // Apply new hover
+      hoveredMesh = object;
+      document.body.style.cursor = 'pointer';
+      hoveredMesh.material.emissiveIntensity = 2.0; // Glow intensely
+      hoveredMesh.scale.set(1.2, 1.2, 1.2);       // Scale up
+    }
+  } else {
+    if (hoveredMesh) {
+      resetHover(hoveredMesh);
+      hoveredMesh = null;
+      document.body.style.cursor = 'default';
+    }
+  }
+});
+
+function resetHover(mesh) {
+  mesh.material.emissiveIntensity = 0.4;
+  mesh.scale.set(1, 1, 1);
+}
+
+// Handle Clicks/Taps (Desktop & Mobile)
+canvas.addEventListener('pointerdown', (e) => {
+  if (engineState !== 'INTERACTIVE') return;
+
+  mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+  mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+  raycaster.setFromCamera(mouse, camera);
+
+  const intersects = raycaster.intersectObjects(linkItems);
+  if (intersects.length > 0) {
+    window.open(intersects[0].object.userData.url, '_blank');
+  }
+});
 
 // --- UI LAYERS ---
 const uiLayer = document.getElementById('ui-layer');
 
-const socialSign = document.createElement('div');
-socialSign.style.cssText = `position: absolute; transform: translate(-50%, -50%); display: none; flex-direction: column; gap: 10px; pointer-events: auto; opacity: 0; transition: opacity 0.3s;`;
-socialSign.innerHTML = `
-  <a href="https://linkedin.com" target="_blank" style="background:#0a66c2; color:white; padding:10px 24px; text-decoration:none; border-radius:6px; font-weight:800; font-size:14px; text-align:center; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">LINKEDIN</a>
-  <a href="https://github.com" target="_blank" style="background:#24292e; color:white; padding:10px 24px; text-decoration:none; border-radius:6px; font-weight:800; font-size:14px; text-align:center; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">GITHUB</a>
-  <a href="https://x.com" target="_blank" style="background:#000000; color:white; border:1px solid #e2e8f0; padding:10px 24px; text-decoration:none; border-radius:6px; font-weight:800; font-size:14px; text-align:center; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">X.COM</a>
-`;
-uiLayer.appendChild(socialSign);
-
-// Mobile Jump Button
 const mobileJumpBtn = document.createElement('div');
 mobileJumpBtn.style.cssText = `position: fixed; bottom: 2rem; right: 2rem; z-index: 25; opacity: 0; pointer-events: none; transition: opacity 1s ease;`;
 mobileJumpBtn.innerHTML = `
@@ -121,7 +211,6 @@ mobileJumpBtn.innerHTML = `
 `;
 document.body.appendChild(mobileJumpBtn);
 
-// NEW: Virtual Analog Joystick
 const joystickZone = document.createElement('div');
 joystickZone.style.cssText = `position: fixed; bottom: 2rem; left: 2rem; width: 120px; height: 120px; background: rgba(15, 23, 42, 0.3); border-radius: 50%; border: 2px solid rgba(56, 189, 248, 0.5); z-index: 25; touch-action: none; display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 1s; backdrop-filter: blur(4px);`;
 
@@ -154,12 +243,12 @@ document.getElementById('action-jump').addEventListener('pointerdown', (e) => {
   if (engineState === 'INTERACTIVE' && !localPlayer.isJumping) localPlayer.isJumping = true;
 });
 
-// Joystick Logic
 let joyActive = false;
 let joyOrigin = { x: 0, y: 0 };
-let joyDelta = { x: 0, y: 0 }; // Normalized -1.0 to 1.0
+let joyDelta = { x: 0, y: 0 };
 
 joystickZone.addEventListener('pointerdown', (e) => {
+  e.stopPropagation(); // Prevents joystick touches from triggering Raycaster clicks
   joyActive = true;
   const rect = joystickZone.getBoundingClientRect();
   joyOrigin.x = rect.left + rect.width / 2;
@@ -182,7 +271,7 @@ function updateJoystick(e) {
   let dx = e.clientX - joyOrigin.x;
   let dy = e.clientY - joyOrigin.y;
   
-  const maxDist = 35; // Maximum pixel distance the knob can travel
+  const maxDist = 35; 
   const dist = Math.sqrt(dx * dx + dy * dy);
   
   if (dist > maxDist) {
@@ -191,7 +280,6 @@ function updateJoystick(e) {
   }
   
   joystickKnob.style.transform = `translate(${dx}px, ${dy}px)`;
-  
   joyDelta.x = dx / maxDist;
   joyDelta.y = dy / maxDist;
 }
@@ -214,7 +302,7 @@ function spawnNetworkEvent() {
   remotePlayer.targetPos.set(-8, 0, -5);
   players.set(remoteId, remotePlayer);
 
-  setTimeout(() => remotePlayer.say('Use the joystick to move around!'), 1000);
+  setTimeout(() => remotePlayer.say('Click those 3D shapes to open links.'), 1000);
   setTimeout(() => remotePlayer.targetPos.set(0, 0, -8), 3500); 
 }
 
@@ -253,30 +341,25 @@ function animate() {
     if (camera.position.distanceTo(idealOffset) < 0.5) {
       engineState = 'INTERACTIVE';
       chatInterface.classList.add('unlocked');
-      socialSign.style.opacity = '1'; 
       mobileJumpBtn.style.opacity = '1';
       mobileJumpBtn.style.pointerEvents = 'auto';
       joystickZone.style.opacity = '1';
-      joystickZone.style.pointerEvents = 'auto'; // Unlock joystick
+      joystickZone.style.pointerEvents = 'auto';
       setTimeout(spawnNetworkEvent, 1500);
     }
   } else if (engineState === 'INTERACTIVE') {
-    // Physics & Velocity Calculation (Keyboard + Joystick)
     let rotVelocity = 0;
     let moveVelocity = 0;
 
-    // Keyboard
     if (keys.a) rotVelocity += 0.05;
     if (keys.d) rotVelocity -= 0.05;
     if (keys.w) moveVelocity += 0.2;
     if (keys.s) moveVelocity -= 0.2;
 
-    // Joystick (Negative Y on screen is forward in 3D)
     rotVelocity -= joyDelta.x * 0.05;
     moveVelocity -= joyDelta.y * 0.2;
 
     localPlayer.mesh.rotation.y += rotVelocity;
-
     const direction = new THREE.Vector3();
     localPlayer.mesh.getWorldDirection(direction);
     localPlayer.mesh.position.addScaledVector(direction, moveVelocity);
@@ -289,25 +372,18 @@ function animate() {
     camera.lookAt(lookTarget);
   }
 
+  // Animate the 3D Social Relics
+  linkItems.forEach((relic, i) => {
+    relic.rotation.y += 0.02;
+    relic.rotation.x += 0.01;
+    // Add a gentle floating bob
+    relic.position.y = relic.userData.baseY + Math.sin(time * 2 + i) * 0.2;
+  });
+
   proj1Holo.rotation.x = time * 0.2;
   proj1Holo.rotation.y = time * 0.4;
   proj2Holo.rotation.x = -time * 0.3;
   proj2Holo.rotation.y = time * 0.5;
-
-  const boardAnchor = new THREE.Vector3(0, 2.5, -11.4);
-  boardAnchor.project(camera);
-  
-  if (boardAnchor.z < 1 && engineState === 'INTERACTIVE') {
-    socialSign.style.display = 'flex';
-    socialSign.style.left = `${(boardAnchor.x * 0.5 + 0.5) * window.innerWidth}px`;
-    socialSign.style.top = `${(boardAnchor.y * -0.5 + 0.5) * window.innerHeight}px`;
-    
-    const distance = camera.position.distanceTo(new THREE.Vector3(0, 2.5, -12));
-    const scale = Math.max(0.3, 10 / distance); 
-    socialSign.style.transform = `translate(-50%, -50%) scale(${scale})`;
-  } else {
-    socialSign.style.display = 'none';
-  }
 
   players.forEach((player) => {
     player.mesh.update(camera);
@@ -315,7 +391,6 @@ function animate() {
 
     const slimeCore = player.mesh.levels[0].object.getObjectByName("slimeCore");
     if (slimeCore) {
-      // Evaluate Movement State (Now includes joystick checks)
       const isLocalMoving = (player.isLocal) && (keys.w || keys.s || keys.a || keys.d || joyDelta.x !== 0 || joyDelta.y !== 0);
       const isRemoteMoving = (!player.isLocal) && (player.mesh.position.distanceTo(player.targetPos) > 0.02);
 
