@@ -95,67 +95,74 @@ const proj2Holo = new THREE.Mesh(
 proj2Holo.position.set(18, 3.5, -10);
 bunkerGroup.add(proj2Base, proj2Holo);
 
-// Cardboard Display Stand
 const cardboard = new THREE.Mesh(new THREE.BoxGeometry(6, 3, 2), cardboardMat);
 cardboard.position.set(0, 1.5, -12);
 cardboard.rotation.y = -0.15;
 bunkerGroup.add(cardboard);
 
-// --- NEW: 3D INTERACTIVE SOCIAL RELICS ---
+// --- NEW: RECOGNIZABLE TEXTURE-BASED ICONS ---
+const textureLoader = new THREE.TextureLoader();
 const linkItems = [];
 
-function createSocialRelic(geometry, color, url, xOffset) {
+function createIconPanel(textureUrl, url, xOffset, color) {
+  // We use a flat plane geometry instead of abstract shapes
+  const geometry = new THREE.PlaneGeometry(1.5, 1.5);
+  
+  // Load the icon texture with transparency enabled
   const material = new THREE.MeshStandardMaterial({
-    color: color,
+    map: textureLoader.load(textureUrl),
+    transparent: true,
+    side: THREE.DoubleSide,
     emissive: color,
-    emissiveIntensity: 0.4,
-    roughness: 0.2,
-    metalness: 0.8
+    emissiveIntensity: 0.1, // Subtle baseline glow
+    roughness: 0.2
   });
   
   const mesh = new THREE.Mesh(geometry, material);
+  mesh.userData = { url: url, baseY: 4.5, hovered: false, color: color };
+  mesh.position.set(xOffset, 4.5, -12);
   
-  // Attach metadata for the raycaster
-  mesh.userData = { 
-    url: url, 
-    baseY: 4.0, // Floating height
-    hovered: false 
-  };
-  
-  // Position above the cardboard stand
-  mesh.position.set(xOffset, 4.0, -12);
-  
-  // Add a protective holographic ring
-  const ringGeo = new THREE.TorusGeometry(0.7, 0.03, 16, 32);
-  const ringMat = new THREE.MeshBasicMaterial({ color: color, transparent: true, opacity: 0.5 });
-  const ring = new THREE.Mesh(ringGeo, ringMat);
-  ring.rotation.x = Math.PI / 2;
-  mesh.add(ring);
+  // Decorative glowing backplate to frame the icon
+  const backplate = new THREE.Mesh(
+    new THREE.CircleGeometry(1.0, 32),
+    new THREE.MeshBasicMaterial({ color: color, transparent: true, opacity: 0.15 })
+  );
+  backplate.position.z = -0.05; // Slightly behind the icon
+  mesh.add(backplate);
 
   bunkerGroup.add(mesh);
   linkItems.push(mesh);
   return mesh;
 }
 
-// 1. LinkedIn (Blue Cube)
-createSocialRelic(new THREE.BoxGeometry(0.7, 0.7, 0.7), 0x0a66c2, 'https://linkedin.com', -2.5);
-
-// 2. GitHub (Dark Sphere)
-createSocialRelic(new THREE.SphereGeometry(0.45, 32, 32), 0x24292e, 'https://github.com', 0);
-
-// 3. X.com (Black Diamond/Octahedron)
-createSocialRelic(new THREE.OctahedronGeometry(0.5, 0), 0x000000, 'https://x.com', 2.5);
+// Icons pulled from clear, transparent CDNs
+createIconPanel(
+  'https://cdn-icons-png.flaticon.com/512/174/174857.png', 
+  'https://linkedin.com', 
+  -2.5, 
+  0x0a66c2
+);
+createIconPanel(
+  'https://cdn-icons-png.flaticon.com/512/25/25231.png', 
+  'https://github.com', 
+  0, 
+  0x000000
+);
+createIconPanel(
+  'https://cdn-icons-png.flaticon.com/512/5969/5969020.png', 
+  'https://x.com', 
+  2.5, 
+  0x000000
+);
 
 // --- RAYCASTING (3D CLICK DETECTION) ---
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
 let hoveredMesh = null;
 
-// Handle Hover Effects (Desktop)
 canvas.addEventListener('pointermove', (e) => {
   if (engineState !== 'INTERACTIVE') return;
 
-  // Convert mouse position to normalized device coordinates (-1 to +1)
   mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
   mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
 
@@ -165,13 +172,15 @@ canvas.addEventListener('pointermove', (e) => {
   if (intersects.length > 0) {
     const object = intersects[0].object;
     if (hoveredMesh !== object) {
-      // Revert previous hover
       if (hoveredMesh) resetHover(hoveredMesh);
-      // Apply new hover
       hoveredMesh = object;
       document.body.style.cursor = 'pointer';
-      hoveredMesh.material.emissiveIntensity = 2.0; // Glow intensely
-      hoveredMesh.scale.set(1.2, 1.2, 1.2);       // Scale up
+      
+      // Intense glow when hovered
+      hoveredMesh.material.emissiveIntensity = 1.0; 
+      hoveredMesh.scale.set(1.15, 1.15, 1.15);       
+      // Brighten the backplate
+      hoveredMesh.children[0].material.opacity = 0.4;
     }
   } else {
     if (hoveredMesh) {
@@ -183,11 +192,11 @@ canvas.addEventListener('pointermove', (e) => {
 });
 
 function resetHover(mesh) {
-  mesh.material.emissiveIntensity = 0.4;
+  mesh.material.emissiveIntensity = 0.1;
   mesh.scale.set(1, 1, 1);
+  mesh.children[0].material.opacity = 0.15;
 }
 
-// Handle Clicks/Taps (Desktop & Mobile)
 canvas.addEventListener('pointerdown', (e) => {
   if (engineState !== 'INTERACTIVE') return;
 
@@ -248,7 +257,7 @@ let joyOrigin = { x: 0, y: 0 };
 let joyDelta = { x: 0, y: 0 };
 
 joystickZone.addEventListener('pointerdown', (e) => {
-  e.stopPropagation(); // Prevents joystick touches from triggering Raycaster clicks
+  e.stopPropagation();
   joyActive = true;
   const rect = joystickZone.getBoundingClientRect();
   joyOrigin.x = rect.left + rect.width / 2;
@@ -284,7 +293,6 @@ function updateJoystick(e) {
   joyDelta.y = dy / maxDist;
 }
 
-// --- TRANSITIONS ---
 const introScreen = document.getElementById('intro-screen');
 const chatInterface = document.getElementById('chat-interface');
 
@@ -302,7 +310,7 @@ function spawnNetworkEvent() {
   remotePlayer.targetPos.set(-8, 0, -5);
   players.set(remoteId, remotePlayer);
 
-  setTimeout(() => remotePlayer.say('Click those 3D shapes to open links.'), 1000);
+  setTimeout(() => remotePlayer.say('The icons look much better now.'), 1000);
   setTimeout(() => remotePlayer.targetPos.set(0, 0, -8), 3500); 
 }
 
@@ -319,7 +327,10 @@ chatInput.addEventListener('keypress', (e) => {
   if (e.key === 'Enter') handleSend();
 });
 
-// --- RENDER PIPELINE ---
+// ANTI-DIZZINESS: Target rotational state for smooth damping
+let currentRotationY = 0;
+let targetRotationY = 0;
+
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
@@ -345,39 +356,56 @@ function animate() {
       mobileJumpBtn.style.pointerEvents = 'auto';
       joystickZone.style.opacity = '1';
       joystickZone.style.pointerEvents = 'auto';
+      currentRotationY = localPlayer.mesh.rotation.y;
+      targetRotationY = localPlayer.mesh.rotation.y;
       setTimeout(spawnNetworkEvent, 1500);
     }
   } else if (engineState === 'INTERACTIVE') {
-    let rotVelocity = 0;
+    // Smoother Kinematics Math
+    let inputRot = 0;
     let moveVelocity = 0;
 
-    if (keys.a) rotVelocity += 0.05;
-    if (keys.d) rotVelocity -= 0.05;
-    if (keys.w) moveVelocity += 0.2;
-    if (keys.s) moveVelocity -= 0.2;
+    // Keyboard Input
+    if (keys.a) inputRot += 0.04;
+    if (keys.d) inputRot -= 0.04;
+    if (keys.w) moveVelocity += 0.15; // Slightly reduced max speed for stability
+    if (keys.s) moveVelocity -= 0.15;
 
-    rotVelocity -= joyDelta.x * 0.05;
-    moveVelocity -= joyDelta.y * 0.2;
+    // Joystick Input
+    inputRot -= joyDelta.x * 0.04;
+    moveVelocity -= joyDelta.y * 0.15;
 
-    localPlayer.mesh.rotation.y += rotVelocity;
+    // Apply rotation to target, then lerp current toward target (Anti-Dizziness)
+    targetRotationY += inputRot;
+    currentRotationY += (targetRotationY - currentRotationY) * 0.15; // Smooth rotational damping
+    localPlayer.mesh.rotation.y = currentRotationY;
+
+    // Apply Forward Velocity
     const direction = new THREE.Vector3();
     localPlayer.mesh.getWorldDirection(direction);
     localPlayer.mesh.position.addScaledVector(direction, moveVelocity);
 
-    const idealOffset = new THREE.Vector3(0, 3, -7).applyQuaternion(localPlayer.mesh.quaternion).add(localPlayer.mesh.position);
-    camera.position.lerp(idealOffset, 0.1);
+    // Damped Camera Follow
+    const idealOffset = new THREE.Vector3(0, 3.5, -8); // Pulled slightly back for wider FOV
+    idealOffset.applyQuaternion(localPlayer.mesh.quaternion);
+    idealOffset.add(localPlayer.mesh.position);
+    
+    // Tighter positional lerp prevents nausea-inducing camera rubberbanding
+    camera.position.lerp(idealOffset, 0.08);
 
     const lookTarget = localPlayer.mesh.position.clone();
-    lookTarget.y += 1.0;
-    camera.lookAt(lookTarget);
+    lookTarget.y += 1.2; // Look slightly above the slime
+    
+    // Lerp the camera look target so it doesn't snap abruptly
+    const currentLook = new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion).add(camera.position);
+    currentLook.lerp(lookTarget, 0.15);
+    camera.lookAt(currentLook);
   }
 
-  // Animate the 3D Social Relics
+  // Make the icons always face the camera (Billboard effect)
   linkItems.forEach((relic, i) => {
-    relic.rotation.y += 0.02;
-    relic.rotation.x += 0.01;
-    // Add a gentle floating bob
-    relic.position.y = relic.userData.baseY + Math.sin(time * 2 + i) * 0.2;
+    relic.lookAt(camera.position);
+    relic.position.y = relic.userData.baseY + Math.sin(time * 2 + i) * 0.15;
   });
 
   proj1Holo.rotation.x = time * 0.2;
@@ -428,7 +456,7 @@ function animate() {
 
     if (!player.isLocal) {
       player.mesh.position.lerp(player.targetPos, 0.05);
-      player.mesh.lookAt(localPlayer.mesh.position.x, player.mesh.position.y, localPlayer.mesh.position.z);
+      player.mesh.lookAt(localPlayer.mesh.position.x, localPlayer.mesh.position.y, localPlayer.mesh.position.z);
     }
   });
 
