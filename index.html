@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ERDIAN | Interactive 3D</title>
+  <title>ERDIAN | Spatial Engine</title>
   <style>
     * {
       margin: 0;
@@ -12,13 +12,13 @@
     }
     body {
       overflow: hidden;
-      background: #050508;
+      background: #020205;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       user-select: none;
       -webkit-user-select: none;
     }
 
-    /* 2D INTRO OVERLAY */
+    /* 2D CINEMATIC INTRO */
     #intro-screen {
       position: fixed;
       inset: 0;
@@ -27,9 +27,9 @@
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      background: #050508;
+      background: radial-gradient(circle at center, #090918 0%, #020205 100%);
       cursor: pointer;
-      transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.8s;
+      transition: opacity 1.2s cubic-bezier(0.16, 1, 0.3, 1), visibility 1.2s;
     }
 
     #intro-screen.hidden {
@@ -43,42 +43,68 @@
       padding: 0 1.5rem;
     }
 
-    .intro-title {
-      font-size: clamp(2.8rem, 8vw, 6rem);
-      font-weight: 800;
-      letter-spacing: 0.18em;
+    .intro-tag {
+      font-size: 0.75rem;
+      letter-spacing: 0.3em;
       text-transform: uppercase;
-      background: linear-gradient(135deg, #ffffff 20%, #6366f1 70%, #a855f7 100%);
+      color: #6366f1;
+      margin-bottom: 0.8rem;
+      font-weight: 600;
+    }
+
+    .intro-title {
+      font-size: clamp(3.2rem, 9vw, 7.5rem);
+      font-weight: 900;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      background: linear-gradient(135deg, #ffffff 0%, #818cf8 50%, #c084fc 100%);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       margin-bottom: 0.75rem;
+      filter: drop-shadow(0 0 35px rgba(99, 102, 241, 0.35));
     }
 
     .intro-subtitle {
-      font-size: clamp(0.9rem, 2vw, 1.15rem);
+      font-size: clamp(0.85rem, 1.8vw, 1.1rem);
       color: #94a3b8;
-      letter-spacing: 0.08em;
-      font-weight: 400;
-      max-width: 480px;
-      margin: 0 auto 2.5rem;
+      letter-spacing: 0.12em;
+      font-weight: 300;
+      max-width: 520px;
+      margin: 0 auto 3rem;
       line-height: 1.6;
     }
 
     .intro-cta {
-      display: inline-block;
-      font-size: 0.85rem;
-      letter-spacing: 0.15em;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.6rem;
+      font-size: 0.8rem;
+      letter-spacing: 0.2em;
       text-transform: uppercase;
-      color: #64748b;
-      animation: pulse-glow 2s infinite ease-in-out;
+      color: #cbd5e1;
+      padding: 0.75rem 1.75rem;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 9999px;
+      background: rgba(255, 255, 255, 0.03);
+      backdrop-filter: blur(8px);
+      animation: float-pulse 2.5s infinite ease-in-out;
     }
 
-    @keyframes pulse-glow {
-      0%, 100% { opacity: 0.4; transform: translateY(0); }
-      50% { opacity: 1; transform: translateY(-2px); color: #cbd5e1; }
+    @keyframes float-pulse {
+      0%, 100% {
+        opacity: 0.6;
+        transform: translateY(0);
+        border-color: rgba(99, 102, 241, 0.25);
+      }
+      50% {
+        opacity: 1;
+        transform: translateY(-3px);
+        border-color: rgba(168, 85, 247, 0.6);
+        box-shadow: 0 0 25px rgba(168, 85, 247, 0.25);
+      }
     }
 
-    /* 3D CANVAS & IN-GAME HUD */
+    /* 3D CANVAS & HUD */
     canvas#webgl {
       position: fixed;
       inset: 0;
@@ -91,32 +117,42 @@
       position: absolute;
       top: 2rem;
       left: 2rem;
-      color: #ffffff;
       z-index: 10;
       pointer-events: none;
       opacity: 0;
-      transition: opacity 1.2s ease;
+      transition: opacity 1.8s ease;
     }
 
     .hud.visible {
       opacity: 1;
     }
 
-    .hud h2 {
-      font-size: 1.1rem;
+    .hud-badge {
+      display: inline-block;
+      font-size: 0.65rem;
       font-weight: 700;
-      letter-spacing: 0.05em;
-      color: #f8fafc;
+      letter-spacing: 0.2em;
+      color: #a855f7;
+      text-transform: uppercase;
+      margin-bottom: 0.3rem;
+    }
+
+    .hud h2 {
+      font-size: 1.2rem;
+      font-weight: 800;
+      letter-spacing: 0.15em;
+      color: #ffffff;
     }
 
     .hud p {
       font-size: 0.75rem;
       color: #64748b;
-      margin-top: 0.2rem;
-      letter-spacing: 0.04em;
+      margin-top: 0.25rem;
+      letter-spacing: 0.05em;
     }
   </style>
 
+  <!-- Modern Module Imports with Addons -->
   <script type="importmap">
     {
       "imports": {
@@ -128,55 +164,87 @@
 </head>
 <body>
 
-  <!-- 2D Landing Screen -->
+  <!-- 2D Overlay -->
   <div id="intro-screen">
     <div class="intro-content">
+      <div class="intro-tag">Project Initialization</div>
       <h1 class="intro-title">ERDIAN</h1>
-      <p class="intro-subtitle">Spatial Engine & Procedural 3D Environment</p>
-      <div class="intro-cta">( Press anywhere to continue )</div>
+      <p class="intro-subtitle">Autonomous Real-Time Shading & Neural Particle Dynamics</p>
+      <div class="intro-cta">Press anywhere to enter</div>
     </div>
   </div>
 
-  <!-- In-Engine Persistent HUD -->
+  <!-- Operational HUD -->
   <div class="hud" id="hud">
-    <h2>ERDIAN</h2>
-    <p>Drag to rotate • Pinch/Scroll to zoom</p>
+    <span class="hud-badge">Online</span>
+    <h2>ERDIAN CORE</h2>
+    <p>Orbit active • Left click drag • Pinch / Scroll zoom</p>
   </div>
 
-  <!-- 3D Render Canvas -->
+  <!-- Render Surface -->
   <canvas id="webgl"></canvas>
 
   <script type="module">
     import * as THREE from 'three';
     import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+    import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+    import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+    import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
-    // --- TRANSITION CONTROLLER ---
-    const introScreen = document.getElementById('intro-screen');
-    const hud = document.getElementById('hud');
-    let entered = false;
+    // --- SYNTHESIZED ATMOSPHERIC AUDIO (WEB AUDIO API) ---
+    function triggerAtmosphereSwell() {
+      try {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (audioCtx.state === 'suspended') {
+          audioCtx.resume();
+        }
 
-    function handleEnter() {
-      if (entered) return;
-      entered = true;
-      introScreen.classList.add('hidden');
-      hud.classList.add('visible');
+        const masterGain = audioCtx.createGain();
+        masterGain.gain.setValueAtTime(0.001, audioCtx.currentTime);
+        masterGain.gain.exponentialRampToValueAtTime(0.3, audioCtx.currentTime + 1.2);
+        masterGain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 5.0);
+        masterGain.connect(audioCtx.destination);
+
+        // Sub harmonic oscillator
+        const subOsc = audioCtx.createOscillator();
+        subOsc.type = 'sine';
+        subOsc.frequency.setValueAtTime(55, audioCtx.currentTime); // A1 note
+        subOsc.frequency.exponentialRampToValueAtTime(110, audioCtx.currentTime + 3.0);
+        subOsc.connect(masterGain);
+
+        // Shimmer oscillator
+        const shimmerOsc = audioCtx.createOscillator();
+        shimmerOsc.type = 'triangle';
+        shimmerOsc.frequency.setValueAtTime(220, audioCtx.currentTime);
+        shimmerOsc.frequency.exponentialRampToValueAtTime(440, audioCtx.currentTime + 2.5);
+
+        // Filter envelope
+        const filter = audioCtx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(300, audioCtx.currentTime);
+        filter.frequency.exponentialRampToValueAtTime(2400, audioCtx.currentTime + 1.8);
+
+        shimmerOsc.connect(filter);
+        filter.connect(masterGain);
+
+        subOsc.start();
+        shimmerOsc.start();
+        subOsc.stop(audioCtx.currentTime + 5.2);
+        shimmerOsc.stop(audioCtx.currentTime + 5.2);
+      } catch (err) {
+        // Audio will fail silently if blocked by hardware policy without crashing 3D
+      }
     }
 
-    // Pointerdown captures both mobile touch and desktop mouse clicks without delay
-    introScreen.addEventListener('pointerdown', handleEnter, { passive: true });
-
-    // --- 1. THREE.JS INITIALIZATION ---
+    // --- 1. RENDERER & SCENE SETUP ---
     const canvas = document.querySelector('#webgl');
     const scene = new THREE.Scene();
-    scene.fog = new THREE.FogExp2(0x050508, 0.035);
+    scene.fog = new THREE.FogExp2(0x020205, 0.025);
 
-    const camera = new THREE.PerspectiveCamera(
-      60,
-      window.innerWidth / window.innerHeight,
-      0.1,
-      100
-    );
-    camera.position.set(0, 1.5, 5);
+    // Initial camera position far out in deep space for warp sequence
+    const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 200);
+    camera.position.set(0, 0, 42);
 
     const renderer = new THREE.WebGLRenderer({
       canvas: canvas,
@@ -186,51 +254,185 @@
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.2;
+    renderer.toneMappingExposure = 1.1;
 
-    // --- 2. LIGHTING ---
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+    // --- 2. POST-PROCESSING (UNREAL BLOOM) ---
+    const renderScene = new RenderPass(scene, camera);
+    const bloomPass = new UnrealBloomPass(
+      new THREE.Vector2(window.innerWidth, window.innerHeight),
+      1.6,  // Bloom Strength
+      0.4,  // Radius
+      0.15  // Threshold
+    );
+
+    const outputPass = new OutputPass();
+
+    const composer = new EffectComposer(renderer);
+    composer.addPass(renderScene);
+    composer.addPass(bloomPass);
+    composer.addPass(outputPass);
+
+    // --- 3. CONTROLS ---
+    const controls = new OrbitControls(camera, canvas);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+    controls.maxDistance = 15;
+    controls.minDistance = 2.5;
+    controls.enabled = false; // Kept locked until fly-in sequence completes
+
+    // --- 4. LIGHTING ---
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.2);
     scene.add(ambientLight);
 
-    const keyLight = new THREE.DirectionalLight(0x60a5fa, 2.5);
-    keyLight.position.set(5, 5, 4);
-    scene.add(keyLight);
+    const coreLight = new THREE.PointLight(0xa855f7, 8, 20);
+    coreLight.position.set(0, 0, 0);
+    scene.add(coreLight);
 
-    const fillLight = new THREE.PointLight(0xf43f5e, 4.0, 10);
-    fillLight.position.set(-4, -2, -2);
-    scene.add(fillLight);
+    const blueRim = new THREE.DirectionalLight(0x38bdf8, 3.5);
+    blueRim.position.set(8, 6, 5);
+    scene.add(blueRim);
 
-    // --- 3. OBJECTS ---
-    const artifactGeo = new THREE.TorusKnotGeometry(0.85, 0.28, 128, 32);
-    const artifactMat = new THREE.MeshStandardMaterial({
-      color: 0x1e1b4b,
-      roughness: 0.15,
+    // --- 5. DUAL-LAYER CORE ARTIFACT ---
+    const coreGroup = new THREE.Group();
+    scene.add(coreGroup);
+
+    // Inner Glowing Core
+    const innerGeo = new THREE.IcosahedronGeometry(0.85, 4);
+    const innerMat = new THREE.MeshStandardMaterial({
+      color: 0x9333ea,
+      emissive: 0x6366f1,
+      emissiveIntensity: 1.4,
+      roughness: 0.1,
       metalness: 0.9
     });
-    const artifact = new THREE.Mesh(artifactGeo, artifactMat);
-    scene.add(artifact);
+    const innerMesh = new THREE.Mesh(innerGeo, innerMat);
+    coreGroup.add(innerMesh);
 
-    // Particle Field
-    const particleCount = 1200;
+    // Outer Wireframe Lattice
+    const outerGeo = new THREE.TorusKnotGeometry(1.2, 0.22, 160, 24);
+    const outerMat = new THREE.MeshStandardMaterial({
+      color: 0x0ea5e9,
+      emissive: 0x0284c7,
+      emissiveIntensity: 0.6,
+      wireframe: true,
+      roughness: 0.2,
+      metalness: 0.8
+    });
+    const outerMesh = new THREE.Mesh(outerGeo, outerMat);
+    coreGroup.add(outerMesh);
+
+    // --- 6. NEBULA PARTICLE GALAXY ---
+    const particleCount = 2500;
     const positions = new Float32Array(particleCount * 3);
+    const colors = new Float32Array(particleCount * 3);
+
+    const color1 = new THREE.Color(0x38bdf8);
+    const color2 = new THREE.Color(0xc084fc);
 
     for (let i = 0; i < particleCount * 3; i += 3) {
-      positions[i] = (Math.random() - 0.5) * 25;
-      positions[i + 1] = (Math.random() - 0.5) * 25;
-      positions[i + 2] = (Math.random() - 0.5) * 25;
+      // Spatial disk distribution
+      const radius = 2 + Math.random() * 18;
+      const theta = Math.random() * Math.PI * 2;
+      const verticalSpread = (Math.random() - 0.5) * 6;
+
+      positions[i] = Math.cos(theta) * radius;
+      positions[i + 1] = verticalSpread;
+      positions[i + 2] = Math.sin(theta) * radius;
+
+      const mixedColor = color1.clone().lerp(color2, Math.random());
+      colors[i] = mixedColor.r;
+      colors[i + 1] = mixedColor.g;
+      colors[i + 2] = mixedColor.b;
     }
 
     const particleGeo = new THREE.BufferGeometry();
     particleGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    particleGeo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 
     const particleMat = new THREE.PointsMaterial({
-      color: 0x94a3b8,
-      size: 0.04,
+      size: 0.055,
+      vertexColors: true,
       transparent: true,
-      opacity: 0.8
+      opacity: 0.85,
+      blending: THREE.AdditiveBlending
     });
 
-    const particles = new THREE.Points(particleGeo, particleMat);
-    scene.add(particles);
+    const particleField = new THREE.Points(particleGeo, particleMat);
+    scene.add(particleField);
 
-    // --- 4. CONTROLS ---
+    // --- 7. CAMERA FLY-IN SEQUENCE ---
+    let warping = false;
+    let targetZ = 4.8;
+    let targetY = 1.2;
+
+    const introScreen = document.getElementById('intro-screen');
+    const hud = document.getElementById('hud');
+
+    function executeEntrance() {
+      if (warping) return;
+      warping = true;
+
+      // Audio trigger
+      triggerAtmosphereSwell();
+
+      // UI Transition
+      introScreen.classList.add('hidden');
+      setTimeout(() => hud.classList.add('visible'), 600);
+    }
+
+    introScreen.addEventListener('pointerdown', executeEntrance, { passive: true });
+
+    // --- 8. RESIZE ADAPTATION ---
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      composer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    // --- 9. RENDER & PHYSICS LOOP ---
+    const clock = new THREE.Clock();
+
+    function renderLoop() {
+      requestAnimationFrame(renderLoop);
+
+      const elapsedTime = clock.getElapsedTime();
+
+      // Warp interpolation execution
+      if (warping) {
+        camera.position.z += (targetZ - camera.position.z) * 0.045;
+        camera.position.y += (targetY - camera.position.y) * 0.045;
+
+        // Give control to user when camera nears arrival
+        if (Math.abs(camera.position.z - targetZ) < 0.2 && !controls.enabled) {
+          controls.enabled = true;
+          controls.target.set(0, 0, 0);
+        }
+      }
+
+      // Counter-rotating artifact elements
+      innerMesh.rotation.y = -elapsedTime * 0.35;
+      innerMesh.rotation.z = elapsedTime * 0.2;
+
+      outerMesh.rotation.y = elapsedTime * 0.25;
+      outerMesh.rotation.x = elapsedTime * 0.15;
+
+      // Pulse emissive radiance
+      innerMat.emissiveIntensity = 1.2 + Math.sin(elapsedTime * 3.0) * 0.5;
+
+      // Particle orbital rotation
+      particleField.rotation.y = elapsedTime * 0.035;
+
+      if (controls.enabled) {
+        controls.update();
+      }
+
+      // Render through the Bloom Composer instead of standard renderer
+      composer.render();
+    }
+
+    renderLoop();
+  </script>
+</body>
+</html>
