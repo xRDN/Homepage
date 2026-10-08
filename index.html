@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ERDIAN | Multiplayer Prototype</title>
+  <title>ERDIAN | Networked Zone</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -13,6 +13,42 @@
       user-select: none;
     }
     
+    /* 1. 2D CINEMATIC INTRO */
+    #intro-screen {
+      position: fixed;
+      inset: 0;
+      z-index: 50;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: radial-gradient(circle at center, #090918 0%, #020205 100%);
+      cursor: pointer;
+      transition: opacity 1.2s cubic-bezier(0.16, 1, 0.3, 1), visibility 1.2s;
+    }
+    #intro-screen.hidden { opacity: 0; visibility: hidden; pointer-events: none; }
+    
+    .intro-title {
+      font-size: clamp(3.2rem, 9vw, 7.5rem);
+      font-weight: 900;
+      letter-spacing: 0.22em;
+      background: linear-gradient(135deg, #ffffff 0%, #818cf8 50%, #c084fc 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 0.75rem;
+    }
+    .intro-cta {
+      font-size: 0.8rem;
+      letter-spacing: 0.2em;
+      color: #cbd5e1;
+      animation: float-pulse 2.5s infinite ease-in-out;
+    }
+    @keyframes float-pulse {
+      0%, 100% { opacity: 0.5; }
+      50% { opacity: 1; }
+    }
+
+    /* 2. 3D & SPATIAL UI */
     canvas#webgl {
       position: fixed;
       inset: 0;
@@ -20,16 +56,12 @@
       height: 100vh;
       outline: none;
     }
-
-    /* Spatial HTML UI Container */
     #ui-layer {
       position: fixed;
       inset: 0;
       pointer-events: none;
       z-index: 10;
     }
-
-    /* Floating Chat Bubbles */
     .chat-bubble {
       position: absolute;
       background: rgba(15, 23, 42, 0.85);
@@ -40,16 +72,14 @@
       font-size: 0.75rem;
       font-weight: 500;
       backdrop-filter: blur(4px);
-      transform: translate(-50%, -100%); /* Center above character */
-      margin-top: -15px; /* Offset above head */
+      transform: translate(-50%, -100%);
+      margin-top: -15px;
       white-space: nowrap;
       pointer-events: none;
       opacity: 0;
       transition: opacity 0.2s;
     }
     .chat-bubble.visible { opacity: 1; }
-
-    /* Player Nameplates */
     .nameplate {
       position: absolute;
       color: #94a3b8;
@@ -61,7 +91,7 @@
       margin-top: 5px;
     }
 
-    /* Game HUD */
+    /* 3. IN-GAME HUD */
     #chat-interface {
       position: fixed;
       bottom: 2rem;
@@ -70,8 +100,14 @@
       display: flex;
       gap: 0.5rem;
       z-index: 20;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 1s ease;
     }
-    
+    #chat-interface.unlocked {
+      opacity: 1;
+      pointer-events: auto;
+    }
     input[type="text"] {
       background: rgba(15, 23, 42, 0.6);
       border: 1px solid rgba(255, 255, 255, 0.2);
@@ -82,8 +118,6 @@
       outline: none;
       backdrop-filter: blur(10px);
     }
-    input[type="text"]:focus { border-color: #6366f1; }
-    
     button {
       background: #6366f1;
       color: white;
@@ -105,13 +139,16 @@
 </head>
 <body>
 
-  <!-- The 3D Canvas -->
-  <canvas id="webgl"></canvas>
+  <!-- Landing Screen -->
+  <div id="intro-screen">
+    <h1 class="intro-title">ERDIAN</h1>
+    <div class="intro-cta">PRESS ANYWHERE TO DEPLOY</div>
+  </div>
 
-  <!-- The 2D Spatial UI Layer -->
+  <canvas id="webgl"></canvas>
   <div id="ui-layer"></div>
 
-  <!-- Chat Input -->
+  <!-- Operational HUD -->
   <div id="chat-interface">
     <input type="text" id="chat-input" placeholder="Press Enter to chat..." autocomplete="off">
     <button id="chat-send">Send</button>
@@ -120,31 +157,54 @@
   <script type="module">
     import * as THREE from 'three';
 
-    // --- 1. CORE ENGINE ---
+    // --- STATE MACHINE ---
+    let engineState = 'INTRO'; // 'INTRO' -> 'WARPING' -> 'INTERACTIVE'
+
+    // --- AUDIO SYSTEM ---
+    function triggerAtmosphereSwell() {
+      try {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        const masterGain = audioCtx.createGain();
+        masterGain.gain.setValueAtTime(0.001, audioCtx.currentTime);
+        masterGain.gain.exponentialRampToValueAtTime(0.3, audioCtx.currentTime + 1.2);
+        masterGain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 5.0);
+        masterGain.connect(audioCtx.destination);
+        const subOsc = audioCtx.createOscillator();
+        subOsc.type = 'sine';
+        subOsc.frequency.setValueAtTime(55, audioCtx.currentTime);
+        subOsc.connect(masterGain);
+        subOsc.start();
+        subOsc.stop(audioCtx.currentTime + 5.2);
+      } catch (e) {}
+    }
+
+    // --- ENGINE INIT ---
     const canvas = document.querySelector('#webgl');
     const scene = new THREE.Scene();
-    scene.fog = new THREE.FogExp2(0x020205, 0.04);
+    scene.fog = new THREE.FogExp2(0x020205, 0.035);
 
+    // Initial Camera High in the Stratosphere
     const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 200);
-    
-    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+    camera.position.set(0, 40, 30);
+    camera.lookAt(0, 0, 0);
+
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: "high-performance" });
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    
-    // Environment
-    scene.add(new THREE.AmbientLight(0xffffff, 0.3));
-    const dirLight = new THREE.DirectionalLight(0x6366f1, 2);
+
+    scene.add(new THREE.AmbientLight(0xffffff, 0.4));
+    const dirLight = new THREE.DirectionalLight(0xa855f7, 2);
     dirLight.position.set(5, 10, 5);
     scene.add(dirLight);
 
-    const grid = new THREE.GridHelper(50, 50, 0x1e1b4b, 0x0f172a);
+    const grid = new THREE.GridHelper(100, 100, 0x1e1b4b, 0x0f172a);
     scene.add(grid);
 
-    // --- 2. PLAYER & MULTIPLAYER ARCHITECTURE ---
+    // --- ENTITY SYSTEM ---
     const uiLayer = document.getElementById('ui-layer');
-    const players = new Map(); // Stores all active clients
+    const players = new Map();
 
-    // Reusable materials for optimization
     const matHigh = new THREE.MeshStandardMaterial({ color: 0x6366f1, roughness: 0.2 });
     const matLow = new THREE.MeshBasicMaterial({ color: 0x4f46e5 });
 
@@ -152,46 +212,32 @@
       constructor(id, isLocal = false) {
         this.id = id;
         this.isLocal = isLocal;
-        
-        // Target positioning for network interpolation (smoothing lag)
         this.targetPos = new THREE.Vector3();
-        this.targetRot = 0;
-
-        // Create LOD (Level of Detail) Mesh
-        this.mesh = new THREE.LOD();
         
-        // High-res geometry (Close up)
+        this.mesh = new THREE.LOD();
         const geoHigh = new THREE.CapsuleGeometry(0.5, 1, 16, 16);
         const meshHigh = new THREE.Mesh(geoHigh, matHigh);
-        meshHigh.position.y = 1; // Stand on ground
-        
-        // Add a "visor" to show forward direction
+        meshHigh.position.y = 1;
         const visor = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.2, 0.4), new THREE.MeshBasicMaterial({color: 0x000000}));
         visor.position.set(0, 0.4, 0.4);
         meshHigh.add(visor);
 
-        // Low-res geometry (Far away)
         const geoLow = new THREE.BoxGeometry(1, 2, 1);
         const meshLow = new THREE.Mesh(geoLow, matLow);
         meshLow.position.y = 1;
 
-        // Add levels to LOD (Distance thresholds)
-        this.mesh.addLevel(meshHigh, 0);   // Under 15m: Render Capsule
-        this.mesh.addLevel(meshLow, 15);   // Over 15m: Render Box
-        
+        this.mesh.addLevel(meshHigh, 0);
+        this.mesh.addLevel(meshLow, 20);
         scene.add(this.mesh);
 
-        // Create Spatial UI Elements
         this.chatElement = document.createElement('div');
         this.chatElement.className = 'chat-bubble';
-        
         this.nameElement = document.createElement('div');
         this.nameElement.className = 'nameplate';
         this.nameElement.innerText = isLocal ? "You" : `Visitor_${id.substring(0,4)}`;
         
         uiLayer.appendChild(this.chatElement);
         uiLayer.appendChild(this.nameElement);
-        
         this.chatTimeout = null;
       }
 
@@ -199,29 +245,21 @@
         this.chatElement.innerText = message;
         this.chatElement.classList.add('visible');
         clearTimeout(this.chatTimeout);
-        this.chatTimeout = setTimeout(() => {
-          this.chatElement.classList.remove('visible');
-        }, 4000);
+        this.chatTimeout = setTimeout(() => this.chatElement.classList.remove('visible'), 4000);
       }
 
       updateSpatialUI(camera) {
-        // Project 3D head position to 2D screen coordinates
         const headPos = this.mesh.position.clone();
-        headPos.y += 2.2; // Top of the capsule
-        
+        headPos.y += 2.2;
         headPos.project(camera);
-
-        // Convert projection to CSS pixels
-        const x = (headPos.x *  .5 + .5) * window.innerWidth;
+        const x = (headPos.x * .5 + .5) * window.innerWidth;
         const y = (headPos.y * -.5 + .5) * window.innerHeight;
 
-        // Hide UI if player is behind camera
         if (headPos.z > 1) {
           this.chatElement.style.display = 'none';
           this.nameElement.style.display = 'none';
           return;
         }
-
         this.chatElement.style.display = 'block';
         this.nameElement.style.display = 'block';
         this.chatElement.style.left = `${x}px`;
@@ -231,97 +269,52 @@
       }
     }
 
-    // Initialize Local Player
-    const localId = "local_" + Math.floor(Math.random() * 1000);
-    const localPlayer = new Player(localId, true);
-    players.set(localId, localPlayer);
+    const localPlayer = new Player("local_" + Math.floor(Math.random() * 1000), true);
+    players.set(localPlayer.id, localPlayer);
 
-    // --- 3. INPUT & THIRD PERSON CAMERA ---
+    // --- KINEMATICS & INPUT ---
     const keys = { w: false, a: false, s: false, d: false };
-    
     window.addEventListener('keydown', (e) => {
-      if (document.activeElement === document.getElementById('chat-input')) return;
+      if (document.activeElement === document.getElementById('chat-input') || engineState !== 'INTERACTIVE') return;
       if (keys.hasOwnProperty(e.key.toLowerCase())) keys[e.key.toLowerCase()] = true;
     });
     window.addEventListener('keyup', (e) => {
       if (keys.hasOwnProperty(e.key.toLowerCase())) keys[e.key.toLowerCase()] = false;
     });
 
-    const moveSpeed = 0.1;
-    const rotSpeed = 0.05;
+    // --- TRANSITION SEQUENCE ---
+    const introScreen = document.getElementById('intro-screen');
+    const chatInterface = document.getElementById('chat-interface');
 
-    function handleLocalMovement() {
-      // 1. Update Rotation
-      if (keys.a) localPlayer.mesh.rotation.y += rotSpeed;
-      if (keys.d) localPlayer.mesh.rotation.y -= rotSpeed;
-
-      // 2. Update Position (forward/backward along local Z axis)
-      const direction = new THREE.Vector3();
-      localPlayer.mesh.getWorldDirection(direction);
-
-      if (keys.w) {
-        localPlayer.mesh.position.addScaledVector(direction, moveSpeed);
-      }
-      if (keys.s) {
-        localPlayer.mesh.position.addScaledVector(direction, -moveSpeed);
-      }
-
-      // 3. Third-Person Camera Follow (Damped)
-      // Calculate ideal camera position (behind and above player)
-      const idealOffset = new THREE.Vector3(0, 3, -6);
-      idealOffset.applyQuaternion(localPlayer.mesh.quaternion);
-      idealOffset.add(localPlayer.mesh.position);
-
-      // Lerp camera to ideal position for smooth follow
-      camera.position.lerp(idealOffset, 0.1);
-      
-      // Look at slightly above player's head
-      const lookAtPos = localPlayer.mesh.position.clone();
-      lookAtPos.y += 1.5;
-      camera.lookAt(lookAtPos);
-    }
-
-    // --- 4. CHAT SYSTEM ---
-    const chatInput = document.getElementById('chat-input');
-    const chatSend = document.getElementById('chat-send');
-
-    function sendChat() {
-      const text = chatInput.value.trim();
-      if (!text) return;
-      
-      localPlayer.say(text);
-      
-      // IN A REAL APP: socket.send({ type: 'chat', msg: text })
-      
-      chatInput.value = '';
-      chatInput.blur();
-    }
-
-    chatSend.addEventListener('click', sendChat);
-    chatInput.addEventListener('keypress', (e) => {
-      if (e.key === 'Enter') sendChat();
+    introScreen.addEventListener('pointerdown', () => {
+      if (engineState !== 'INTRO') return;
+      engineState = 'WARPING';
+      introScreen.classList.add('hidden');
+      triggerAtmosphereSwell();
     });
 
-    // --- 5. NETWORK SIMULATOR (Faking WebSockets) ---
-    // This simulates data arriving from other players over the internet
-    function simulateIncomingNetworkData() {
-      // Spawn a fake visitor
-      const remoteId = "remote_992";
-      if (!players.has(remoteId)) {
-        const remotePlayer = new Player(remoteId);
-        remotePlayer.mesh.position.set(5, 0, 5);
-        remotePlayer.targetPos.set(5, 0, 5);
-        players.set(remoteId, remotePlayer);
-        
-        setTimeout(() => remotePlayer.say("Whoa, where am I?"), 2000);
-        setTimeout(() => remotePlayer.targetPos.set(2, 0, -2), 4000);
-        setTimeout(() => remotePlayer.say("Cool rendering engine."), 6000);
-      }
+    // --- SIMULATED MULTIPLAYER DATA ---
+    function spawnNetworkEvent() {
+      const remoteId = "remote_" + Math.floor(Math.random() * 9000);
+      const remotePlayer = new Player(remoteId);
+      remotePlayer.mesh.position.set(10, 0, 10);
+      remotePlayer.targetPos.set(10, 0, 10);
+      players.set(remoteId, remotePlayer);
+      
+      setTimeout(() => remotePlayer.say("Connection established."), 1000);
+      setTimeout(() => remotePlayer.targetPos.set(3, 0, -3), 2000);
     }
-    
-    setTimeout(simulateIncomingNetworkData, 1000);
 
-    // --- 6. MAIN RENDER LOOP ---
+    // --- UI EVENTS ---
+    const chatInput = document.getElementById('chat-input');
+    document.getElementById('chat-send').addEventListener('click', () => {
+      if (chatInput.value.trim()) { localPlayer.say(chatInput.value.trim()); chatInput.value = ''; }
+    });
+    chatInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') document.getElementById('chat-send').click();
+    });
+
+    // --- RENDER PIPELINE ---
     window.addEventListener('resize', () => {
       camera.aspect = window.innerWidth / window.innerHeight;
       camera.updateProjectionMatrix();
@@ -331,28 +324,49 @@
     function animate() {
       requestAnimationFrame(animate);
 
-      // Process movement for local player
-      handleLocalMovement();
-
-      // Process Networked Players
-      players.forEach((player) => {
-        // Update LODs based on distance to camera
-        player.mesh.update(camera);
+      // STATE EVALUATION
+      if (engineState === 'WARPING') {
+        const idealOffset = new THREE.Vector3(0, 4, -8).applyQuaternion(localPlayer.mesh.quaternion).add(localPlayer.mesh.position);
+        camera.position.lerp(idealOffset, 0.035); // Smooth descent
         
-        // Project 3D position to HTML UI
-        player.updateSpatialUI(camera);
+        const lookTarget = localPlayer.mesh.position.clone();
+        lookTarget.y += 1.5;
+        camera.lookAt(lookTarget);
 
-        // Network Smoothing: Glide remote players to their target coordinates
+        if (camera.position.distanceTo(idealOffset) < 0.5) {
+          engineState = 'INTERACTIVE';
+          chatInterface.classList.add('unlocked');
+          setTimeout(spawnNetworkEvent, 1500); // Trigger network sequence after landing
+        }
+      } 
+      else if (engineState === 'INTERACTIVE') {
+        // Local WASD Physics
+        if (keys.a) localPlayer.mesh.rotation.y += 0.05;
+        if (keys.d) localPlayer.mesh.rotation.y -= 0.05;
+
+        const direction = new THREE.Vector3();
+        localPlayer.mesh.getWorldDirection(direction);
+        if (keys.w) localPlayer.mesh.position.addScaledVector(direction, 0.15);
+        if (keys.s) localPlayer.mesh.position.addScaledVector(direction, -0.15);
+
+        // 3rd Person Follow
+        const idealOffset = new THREE.Vector3(0, 4, -8).applyQuaternion(localPlayer.mesh.quaternion).add(localPlayer.mesh.position);
+        camera.position.lerp(idealOffset, 0.1);
+        const lookTarget = localPlayer.mesh.position.clone();
+        lookTarget.y += 1.5;
+        camera.lookAt(lookTarget);
+      }
+
+      // GLOBAL ENTITY UPDATES
+      players.forEach((player) => {
+        player.mesh.update(camera); // Update LOD
+        player.updateSpatialUI(camera); // Sync HTML text to 3D head
+
         if (!player.isLocal) {
-          player.mesh.position.lerp(player.targetPos, 0.05);
-          // (In a real app, you would also lerp player.targetRot)
-          
-          // Make remote players look at the local player (just for this demo)
+          player.mesh.position.lerp(player.targetPos, 0.05); // Smooth lag from network
           player.mesh.lookAt(localPlayer.mesh.position.x, player.mesh.position.y, localPlayer.mesh.position.z);
         }
       });
-
-      // IN A REAL APP: socket.send({ x: localPlayer.x, z: localPlayer.z })
 
       renderer.render(scene, camera);
     }
