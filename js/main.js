@@ -190,10 +190,13 @@ function animate() {
     player.mesh.update(camera);
     player.updateSpatialUI(camera);
 
-    // Add idle floating animation to the hands (Children index 3 and 4)
-    if (player.mesh.levels[0].object.children[3]) {
-      player.mesh.levels[0].object.children[3].position.y = 0.7 + Math.sin(time) * 0.05;
-      player.mesh.levels[0].object.children[4].position.y = 0.7 + Math.sin(time + Math.PI) * 0.05;
+    // Safely target and animate the named floating paws
+    const leftPaw = player.mesh.levels[0].object.getObjectByName("lHand");
+    const rightPaw = player.mesh.levels[0].object.getObjectByName("rHand");
+    
+    if (leftPaw && rightPaw) {
+      leftPaw.position.y = 0.4 + Math.sin(time) * 0.05;
+      rightPaw.position.y = 0.4 + Math.sin(time + Math.PI) * 0.05;
     }
 
     if (!player.isLocal) {
