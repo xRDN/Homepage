@@ -7,7 +7,10 @@ let engineState = 'INTRO';
 // --- CORE SETUP ---
 const canvas = document.querySelector('#webgl');
 const scene = new THREE.Scene();
-scene.fog = new THREE.FogExp2(0x0a0a0f, 0.02); // Reduced fog density for wider visibility
+
+// 1. Brighten the Atmosphere & Background
+scene.background = new THREE.Color(0xf8fafc); // Bright slate white
+scene.fog = new THREE.FogExp2(0xf8fafc, 0.012); // Light atmospheric haze
 
 const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 300);
 camera.position.set(0, 40, 30);
@@ -16,22 +19,25 @@ camera.lookAt(0, 0, 0);
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+// Softer tone mapping for daylight
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.0;
 
-// --- BUILD THE EXPANDED BUNKER ---
+// --- BUILD THE BRIGHT LABORATORY ---
 const bunkerGroup = new THREE.Group();
 scene.add(bunkerGroup);
 
-// Materials
-const concreteMat = new THREE.MeshStandardMaterial({ color: 0x2a2a30, roughness: 0.9, metalness: 0.1 });
-const darkMetal = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.5, metalness: 0.9 });
-const cardboardMat = new THREE.MeshStandardMaterial({ color: 0xc29b6c, roughness: 1.0 });
+// 2. Lightened Materials
+const concreteMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.8, metalness: 0.1 }); // Light gray concrete
+const darkMetal = new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.4, metalness: 0.7 }); // Bright steel
+const cardboardMat = new THREE.MeshStandardMaterial({ color: 0xeab308, roughness: 0.9 }); // Vibrant cardboard
 
-// 1. Widened Floor (Expanded from 40x40 to 80x80)
+// Widened Floor
 const floor = new THREE.Mesh(new THREE.PlaneGeometry(80, 80), concreteMat);
 floor.rotation.x = -Math.PI / 2;
 bunkerGroup.add(floor);
 
-// 2. Distant Walls
+// Distant Walls
 const wallGeo = new THREE.BoxGeometry(80, 15, 1);
 const wallN = new THREE.Mesh(wallGeo, concreteMat); wallN.position.set(0, 7.5, -40);
 const wallS = new THREE.Mesh(wallGeo, concreteMat); wallS.position.set(0, 7.5, 40);
@@ -39,7 +45,7 @@ const wallE = new THREE.Mesh(wallGeo, concreteMat); wallE.position.set(40, 7.5, 
 const wallW = new THREE.Mesh(wallGeo, concreteMat); wallW.position.set(-40, 7.5, 0); wallW.rotation.y = Math.PI / 2;
 bunkerGroup.add(wallN, wallS, wallE, wallW);
 
-// 3. Spaced Pillars
+// Spaced Pillars
 const pillarGeo = new THREE.BoxGeometry(2, 15, 2);
 const pillarPositions = [ [-20, -20], [20, -20], [-20, 20], [20, 20] ];
 pillarPositions.forEach(pos => {
@@ -48,39 +54,45 @@ pillarPositions.forEach(pos => {
   bunkerGroup.add(pillar);
 });
 
-// 4. Physical Lightbulbs & Illumination Grid
-scene.add(new THREE.AmbientLight(0x111118, 2.5)); // Brighter baseline lighting
+// 3. Global Daylight Illumination
+scene.add(new THREE.AmbientLight(0xffffff, 2.5)); // Strong white ambient bounce
+
+// Hemisphere light acts as a giant skybox light (Sky Color, Ground Color, Intensity)
+const hemiLight = new THREE.HemisphereLight(0xffffff, 0xe2e8f0, 2.0);
+scene.add(hemiLight);
+
+// Sunlight casting across the floor
+const sunLight = new THREE.DirectionalLight(0xfffbeb, 3.0);
+sunLight.position.set(20, 30, 20);
+scene.add(sunLight);
 
 function createLightbulb(x, y, z, hexColor, intensity) {
-  // Glowing bulb mesh
   const bulb = new THREE.Mesh(
     new THREE.SphereGeometry(0.6, 16, 16),
-    new THREE.MeshStandardMaterial({ color: 0x000000, emissive: hexColor, emissiveIntensity: 2.0 })
+    new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: hexColor, emissiveIntensity: 1.5 })
   );
   bulb.position.set(x, y, z);
 
-  // Hanging wire
   const wire = new THREE.Mesh(
     new THREE.CylinderGeometry(0.05, 0.05, y),
-    new THREE.MeshBasicMaterial({ color: 0x000000 })
+    new THREE.MeshBasicMaterial({ color: 0x64748b })
   );
   wire.position.set(x, y * 1.5, z);
 
-  // Actual light source
+  // Point lights add local color accents to the bright room
   const light = new THREE.PointLight(hexColor, intensity, 60, 1.5);
   light.position.set(x, y, z);
   
   bunkerGroup.add(bulb, wire, light);
 }
 
-// Warm central lights and cool perimeter lights
-createLightbulb(0, 10, 0, 0xffeedd, 120);
-createLightbulb(-20, 9, -20, 0x38bdf8, 80);
-createLightbulb(20, 9, -20, 0xa855f7, 80);
-createLightbulb(0, 9, 20, 0xffeedd, 80);
+// Accent lights
+createLightbulb(0, 10, 0, 0xffffff, 50);
+createLightbulb(-20, 9, -20, 0x38bdf8, 60);
+createLightbulb(20, 9, -20, 0xa855f7, 60);
+createLightbulb(0, 9, 20, 0xffeedd, 50);
 
-// 5. Project Showcases
-// Project A (Left)
+// Project Showcases
 const proj1Base = new THREE.Mesh(new THREE.CylinderGeometry(2, 2.5, 1.5, 32), darkMetal);
 proj1Base.position.set(-18, 0.75, -10);
 const proj1Holo = new THREE.Mesh(
@@ -88,10 +100,8 @@ const proj1Holo = new THREE.Mesh(
   new THREE.MeshStandardMaterial({ color: 0x000000, emissive: 0x38bdf8, wireframe: true })
 );
 proj1Holo.position.set(-18, 3.5, -10);
-proj1Holo.name = "project1";
 bunkerGroup.add(proj1Base, proj1Holo);
 
-// Project B (Right)
 const proj2Base = new THREE.Mesh(new THREE.CylinderGeometry(2, 2.5, 1.5, 32), darkMetal);
 proj2Base.position.set(18, 0.75, -10);
 const proj2Holo = new THREE.Mesh(
@@ -99,23 +109,18 @@ const proj2Holo = new THREE.Mesh(
   new THREE.MeshStandardMaterial({ color: 0x000000, emissive: 0xa855f7, wireframe: true })
 );
 proj2Holo.position.set(18, 3.5, -10);
-proj2Holo.name = "project2";
 bunkerGroup.add(proj2Base, proj2Holo);
 
-// 6. The Cardboard Social Box
+// Cardboard Social Box
 const cardboard = new THREE.Mesh(new THREE.BoxGeometry(4, 5, 1), cardboardMat);
 cardboard.position.set(0, 2.5, -12);
-// Rotate slightly for a casual look
 cardboard.rotation.y = -0.15;
 cardboard.rotation.z = 0.05;
 bunkerGroup.add(cardboard);
 
-// --- SPATIAL UI ANCHORS (HTML over 3D) ---
+// --- SPATIAL UI ANCHORS ---
 const uiLayer = document.getElementById('ui-layer');
-
-// Injecting Clickable Social Links
 const socialSign = document.createElement('div');
-// Inline CSS guarantees it overrides the pointer-events block from the parent layer
 socialSign.style.cssText = `
   position: absolute;
   transform: translate(-50%, -50%);
@@ -128,9 +133,9 @@ socialSign.style.cssText = `
 `;
 
 socialSign.innerHTML = `
-  <a href="https://linkedin.com" target="_blank" style="background:#0a66c2; color:white; padding:10px 24px; text-decoration:none; border-radius:6px; font-weight:800; font-size:14px; text-align:center; box-shadow: 0 4px 12px rgba(0,0,0,0.5);">LINKEDIN</a>
-  <a href="https://github.com" target="_blank" style="background:#24292e; color:white; padding:10px 24px; text-decoration:none; border-radius:6px; font-weight:800; font-size:14px; text-align:center; box-shadow: 0 4px 12px rgba(0,0,0,0.5);">GITHUB</a>
-  <a href="https://x.com" target="_blank" style="background:#000000; color:white; border:1px solid #444; padding:10px 24px; text-decoration:none; border-radius:6px; font-weight:800; font-size:14px; text-align:center; box-shadow: 0 4px 12px rgba(0,0,0,0.5);">X.COM</a>
+  <a href="https://linkedin.com" target="_blank" style="background:#0a66c2; color:white; padding:10px 24px; text-decoration:none; border-radius:6px; font-weight:800; font-size:14px; text-align:center; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">LINKEDIN</a>
+  <a href="https://github.com" target="_blank" style="background:#24292e; color:white; padding:10px 24px; text-decoration:none; border-radius:6px; font-weight:800; font-size:14px; text-align:center; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">GITHUB</a>
+  <a href="https://x.com" target="_blank" style="background:#000000; color:white; border:1px solid #e2e8f0; padding:10px 24px; text-decoration:none; border-radius:6px; font-weight:800; font-size:14px; text-align:center; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">X.COM</a>
 `;
 uiLayer.appendChild(socialSign);
 
@@ -167,8 +172,8 @@ function spawnNetworkEvent() {
   remotePlayer.targetPos.set(-8, 0, -5);
   players.set(remoteId, remotePlayer);
 
-  setTimeout(() => remotePlayer.say('So much more space in here now.'), 1000);
-  setTimeout(() => remotePlayer.targetPos.set(0, 0, -8), 3500); // Walk toward the cardboard
+  setTimeout(() => remotePlayer.say('Wow, the lighting in here is great.'), 1000);
+  setTimeout(() => remotePlayer.targetPos.set(0, 0, -8), 3500); 
 }
 
 // --- UI CHAT LOGIC ---
@@ -207,7 +212,7 @@ function animate() {
     if (camera.position.distanceTo(idealOffset) < 0.5) {
       engineState = 'INTERACTIVE';
       chatInterface.classList.add('unlocked');
-      socialSign.style.opacity = '1'; // Fade in social links
+      socialSign.style.opacity = '1'; 
       setTimeout(spawnNetworkEvent, 1500);
     }
   } else if (engineState === 'INTERACTIVE') {
@@ -227,14 +232,11 @@ function animate() {
     camera.lookAt(lookTarget);
   }
 
-  // Animate Showcase Holograms
   proj1Holo.rotation.x = time * 0.2;
   proj1Holo.rotation.y = time * 0.4;
   proj2Holo.rotation.x = -time * 0.3;
   proj2Holo.rotation.y = time * 0.5;
 
-  // Render Spatial UI for the Cardboard Sign
-  // We project a point slightly in front of the cardboard's surface so the HTML floats cleanly over it
   const boardAnchor = new THREE.Vector3(0, 2.5, -11.4);
   boardAnchor.project(camera);
   
@@ -243,7 +245,6 @@ function animate() {
     socialSign.style.left = `${(boardAnchor.x * 0.5 + 0.5) * window.innerWidth}px`;
     socialSign.style.top = `${(boardAnchor.y * -0.5 + 0.5) * window.innerHeight}px`;
     
-    // Scale UI dynamically based on camera distance (Perspective effect)
     const distance = camera.position.distanceTo(new THREE.Vector3(0, 2.5, -12));
     const scale = Math.max(0.3, 10 / distance); 
     socialSign.style.transform = `translate(-50%, -50%) scale(${scale})`;
@@ -255,7 +256,6 @@ function animate() {
     player.mesh.update(camera);
     player.updateSpatialUI(camera);
 
-    // Jumping Slime Physics
     const slimeCore = player.mesh.levels[0].object.getObjectByName("slimeCore");
     if (slimeCore) {
       const jumpTrajectory = Math.abs(Math.sin(time * 1.5));
