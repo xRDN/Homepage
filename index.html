@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ERDIAN | Networked Zone</title>
+  <title>ERDIAN | Multiplayer Engine</title>
   <link rel="stylesheet" href="./css/style.css">
 
   <script type="importmap">
@@ -16,22 +16,36 @@
 </head>
 <body>
 
-  <!-- Landing Screen -->
+  <!-- Landing & Character Select Screen -->
+  <!-- 1. Landing Screen -->
   <div id="intro-screen">
     <h1 class="intro-title">ERDIAN</h1>
-    <div class="intro-cta">PRESS ANYWHERE TO DEPLOY</div>
+    <div class="intro-cta" id="btn-start">PRESS TO CONTINUE</div>
+  </div>
+
+  <!-- 2. Character Select Screen -->
+  <div id="char-select-screen" class="hidden">
+    <h2 class="select-header">SELECT AVATAR</h2>
+    <div class="char-options">
+      <button class="char-btn active" data-type="slime">CYBER SLIME</button>
+      <button class="char-btn" data-type="mecha">MECHA BOT</button>
+    </div>
+    <div class="intro-cta" id="btn-deploy" style="margin-top: 3rem;">CONFIRM & DEPLOY</div>
   </div>
 
   <canvas id="webgl"></canvas>
   <div id="ui-layer"></div>
 
-  <!-- Operational HUD -->
+  <!-- Touch Zones for Mobile -->
+  <div id="camera-zone"></div>
+
+  <!-- Operational HUD (Animated in via CSS) -->
   <div id="chat-interface">
     <input type="text" id="chat-input" placeholder="Press Enter to chat..." autocomplete="off">
     <button id="chat-send">Send</button>
   </div>
 
   <!-- Entry Script -->
-  <script type="module" src="./js/main.js"></script>
+  <script type="module" src="./js/main.js?v=10"></script>
 </body>
 </html>
