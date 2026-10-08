@@ -7,9 +7,9 @@ let engineState = 'INTRO';
 // --- CORE SETUP ---
 const canvas = document.querySelector('#webgl');
 const scene = new THREE.Scene();
-scene.fog = new THREE.FogExp2(0x0a0a0f, 0.04); // Dark, dusty atmosphere
+scene.fog = new THREE.FogExp2(0x0a0a0f, 0.02); // Reduced fog density for wider visibility
 
-const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 200);
+const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 300);
 camera.position.set(0, 40, 30);
 camera.lookAt(0, 0, 0);
 
@@ -17,79 +17,124 @@ const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPrefere
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
-// --- BUILD THE UNDERGROUND BUNKER APARTMENT ---
-function buildBunker() {
-  const bunkerGroup = new THREE.Group();
+// --- BUILD THE EXPANDED BUNKER ---
+const bunkerGroup = new THREE.Group();
+scene.add(bunkerGroup);
+
+// Materials
+const concreteMat = new THREE.MeshStandardMaterial({ color: 0x2a2a30, roughness: 0.9, metalness: 0.1 });
+const darkMetal = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.5, metalness: 0.9 });
+const cardboardMat = new THREE.MeshStandardMaterial({ color: 0xc29b6c, roughness: 1.0 });
+
+// 1. Widened Floor (Expanded from 40x40 to 80x80)
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(80, 80), concreteMat);
+floor.rotation.x = -Math.PI / 2;
+bunkerGroup.add(floor);
+
+// 2. Distant Walls
+const wallGeo = new THREE.BoxGeometry(80, 15, 1);
+const wallN = new THREE.Mesh(wallGeo, concreteMat); wallN.position.set(0, 7.5, -40);
+const wallS = new THREE.Mesh(wallGeo, concreteMat); wallS.position.set(0, 7.5, 40);
+const wallE = new THREE.Mesh(wallGeo, concreteMat); wallE.position.set(40, 7.5, 0); wallE.rotation.y = Math.PI / 2;
+const wallW = new THREE.Mesh(wallGeo, concreteMat); wallW.position.set(-40, 7.5, 0); wallW.rotation.y = Math.PI / 2;
+bunkerGroup.add(wallN, wallS, wallE, wallW);
+
+// 3. Spaced Pillars
+const pillarGeo = new THREE.BoxGeometry(2, 15, 2);
+const pillarPositions = [ [-20, -20], [20, -20], [-20, 20], [20, 20] ];
+pillarPositions.forEach(pos => {
+  const pillar = new THREE.Mesh(pillarGeo, darkMetal);
+  pillar.position.set(pos[0], 7.5, pos[1]);
+  bunkerGroup.add(pillar);
+});
+
+// 4. Physical Lightbulbs & Illumination Grid
+scene.add(new THREE.AmbientLight(0x111118, 2.5)); // Brighter baseline lighting
+
+function createLightbulb(x, y, z, hexColor, intensity) {
+  // Glowing bulb mesh
+  const bulb = new THREE.Mesh(
+    new THREE.SphereGeometry(0.6, 16, 16),
+    new THREE.MeshStandardMaterial({ color: 0x000000, emissive: hexColor, emissiveIntensity: 2.0 })
+  );
+  bulb.position.set(x, y, z);
+
+  // Hanging wire
+  const wire = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.05, 0.05, y),
+    new THREE.MeshBasicMaterial({ color: 0x000000 })
+  );
+  wire.position.set(x, y * 1.5, z);
+
+  // Actual light source
+  const light = new THREE.PointLight(hexColor, intensity, 60, 1.5);
+  light.position.set(x, y, z);
   
-  // Materials
-  const concreteMat = new THREE.MeshStandardMaterial({ color: 0x1f1f24, roughness: 0.9, metalness: 0.1 });
-  const darkMetal = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.5, metalness: 0.9 });
-  const screenMat = new THREE.MeshStandardMaterial({ color: 0x000000, emissive: 0x06b6d4, emissiveIntensity: 1.2 });
-  const fabricMat = new THREE.MeshStandardMaterial({ color: 0x4f46e5, roughness: 1.0 }); // Purple bed
-
-  // Floor
-  const floor = new THREE.Mesh(new THREE.PlaneGeometry(40, 40), concreteMat);
-  floor.rotation.x = -Math.PI / 2;
-  bunkerGroup.add(floor);
-
-  // Structural Pillars
-  const pillarGeo = new THREE.BoxGeometry(1.5, 6, 1.5);
-  const positions = [ [-10, -10], [10, -10], [-10, 10], [10, 10] ];
-  positions.forEach(pos => {
-    const pillar = new THREE.Mesh(pillarGeo, concreteMat);
-    pillar.position.set(pos[0], 3, pos[1]);
-    bunkerGroup.add(pillar);
-  });
-
-  // Elevated Bed Area
-  const platform = new THREE.Mesh(new THREE.BoxGeometry(8, 0.5, 6), darkMetal);
-  platform.position.set(-12, 0.25, -10);
-  const bed = new THREE.Mesh(new THREE.BoxGeometry(4, 0.8, 5), fabricMat);
-  bed.position.set(-13, 0.9, -10);
-  bunkerGroup.add(platform, bed);
-
-  // Hacker Desk Area
-  const desk = new THREE.Mesh(new THREE.BoxGeometry(6, 0.2, 2), darkMetal);
-  desk.position.set(10, 1.5, -12);
-  
-  const screen1 = new THREE.Mesh(new THREE.BoxGeometry(2, 1.2, 0.1), screenMat);
-  screen1.position.set(9, 2.5, -12.5);
-  screen1.rotation.y = 0.2;
-  
-  const screen2 = new THREE.Mesh(new THREE.BoxGeometry(2, 1.2, 0.1), screenMat);
-  screen2.position.set(11.2, 2.5, -12.2);
-  screen2.rotation.y = -0.3;
-
-  bunkerGroup.add(desk, screen1, screen2);
-
-  // Perimeter Walls (Low-poly abstraction)
-  const wallGeo = new THREE.BoxGeometry(40, 6, 1);
-  const wallN = new THREE.Mesh(wallGeo, concreteMat); wallN.position.set(0, 3, -15);
-  const wallS = new THREE.Mesh(wallGeo, concreteMat); wallS.position.set(0, 3, 15);
-  const wallE = new THREE.Mesh(wallGeo, concreteMat); wallE.position.set(15, 3, 0); wallE.rotation.y = Math.PI / 2;
-  const wallW = new THREE.Mesh(wallGeo, concreteMat); wallW.position.set(-15, 3, 0); wallW.rotation.y = Math.PI / 2;
-  bunkerGroup.add(wallN, wallS, wallE, wallW);
-
-  scene.add(bunkerGroup);
-
-  // Lighting the Bunker
-  scene.add(new THREE.AmbientLight(0x0a0a0f, 1.5)); // Very dark ambient
-  
-  // Central warm incandescent light
-  const mainLight = new THREE.PointLight(0xffaa55, 100, 30, 1.5);
-  mainLight.position.set(0, 5, 0);
-  scene.add(mainLight);
-
-  // Cold cyan light spilling from the hacker desk
-  const deskLight = new THREE.PointLight(0x06b6d4, 80, 15, 1.5);
-  deskLight.position.set(10, 3, -10);
-  scene.add(deskLight);
+  bunkerGroup.add(bulb, wire, light);
 }
 
-buildBunker();
+// Warm central lights and cool perimeter lights
+createLightbulb(0, 10, 0, 0xffeedd, 120);
+createLightbulb(-20, 9, -20, 0x38bdf8, 80);
+createLightbulb(20, 9, -20, 0xa855f7, 80);
+createLightbulb(0, 9, 20, 0xffeedd, 80);
+
+// 5. Project Showcases
+// Project A (Left)
+const proj1Base = new THREE.Mesh(new THREE.CylinderGeometry(2, 2.5, 1.5, 32), darkMetal);
+proj1Base.position.set(-18, 0.75, -10);
+const proj1Holo = new THREE.Mesh(
+  new THREE.IcosahedronGeometry(1.5, 1),
+  new THREE.MeshStandardMaterial({ color: 0x000000, emissive: 0x38bdf8, wireframe: true })
+);
+proj1Holo.position.set(-18, 3.5, -10);
+proj1Holo.name = "project1";
+bunkerGroup.add(proj1Base, proj1Holo);
+
+// Project B (Right)
+const proj2Base = new THREE.Mesh(new THREE.CylinderGeometry(2, 2.5, 1.5, 32), darkMetal);
+proj2Base.position.set(18, 0.75, -10);
+const proj2Holo = new THREE.Mesh(
+  new THREE.TorusKnotGeometry(1, 0.3, 100, 16),
+  new THREE.MeshStandardMaterial({ color: 0x000000, emissive: 0xa855f7, wireframe: true })
+);
+proj2Holo.position.set(18, 3.5, -10);
+proj2Holo.name = "project2";
+bunkerGroup.add(proj2Base, proj2Holo);
+
+// 6. The Cardboard Social Box
+const cardboard = new THREE.Mesh(new THREE.BoxGeometry(4, 5, 1), cardboardMat);
+cardboard.position.set(0, 2.5, -12);
+// Rotate slightly for a casual look
+cardboard.rotation.y = -0.15;
+cardboard.rotation.z = 0.05;
+bunkerGroup.add(cardboard);
+
+// --- SPATIAL UI ANCHORS (HTML over 3D) ---
+const uiLayer = document.getElementById('ui-layer');
+
+// Injecting Clickable Social Links
+const socialSign = document.createElement('div');
+// Inline CSS guarantees it overrides the pointer-events block from the parent layer
+socialSign.style.cssText = `
+  position: absolute;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  pointer-events: auto;
+  opacity: 0;
+  transition: opacity 0.3s;
+`;
+
+socialSign.innerHTML = `
+  <a href="https://linkedin.com" target="_blank" style="background:#0a66c2; color:white; padding:10px 24px; text-decoration:none; border-radius:6px; font-weight:800; font-size:14px; text-align:center; box-shadow: 0 4px 12px rgba(0,0,0,0.5);">LINKEDIN</a>
+  <a href="https://github.com" target="_blank" style="background:#24292e; color:white; padding:10px 24px; text-decoration:none; border-radius:6px; font-weight:800; font-size:14px; text-align:center; box-shadow: 0 4px 12px rgba(0,0,0,0.5);">GITHUB</a>
+  <a href="https://x.com" target="_blank" style="background:#000000; color:white; border:1px solid #444; padding:10px 24px; text-decoration:none; border-radius:6px; font-weight:800; font-size:14px; text-align:center; box-shadow: 0 4px 12px rgba(0,0,0,0.5);">X.COM</a>
+`;
+uiLayer.appendChild(socialSign);
 
 // --- ENTITIES ---
-const uiLayer = document.getElementById('ui-layer');
 const players = new Map();
 const localPlayer = new Player('local_' + Math.floor(Math.random() * 1000), scene, uiLayer, true);
 players.set(localPlayer.id, localPlayer);
@@ -118,13 +163,12 @@ introScreen.addEventListener('pointerdown', () => {
 function spawnNetworkEvent() {
   const remoteId = 'remote_' + Math.floor(Math.random() * 9000);
   const remotePlayer = new Player(remoteId, scene, uiLayer, false);
-  // Spawn friend near the desk
-  remotePlayer.mesh.position.set(8, 0, -8);
-  remotePlayer.targetPos.set(8, 0, -8);
+  remotePlayer.mesh.position.set(-8, 0, -5);
+  remotePlayer.targetPos.set(-8, 0, -5);
   players.set(remoteId, remotePlayer);
 
-  setTimeout(() => remotePlayer.say('Nice bunker layout.'), 1000);
-  setTimeout(() => remotePlayer.targetPos.set(5, 0, -5), 3000);
+  setTimeout(() => remotePlayer.say('So much more space in here now.'), 1000);
+  setTimeout(() => remotePlayer.targetPos.set(0, 0, -8), 3500); // Walk toward the cardboard
 }
 
 // --- UI CHAT LOGIC ---
@@ -150,10 +194,10 @@ window.addEventListener('resize', () => {
 
 function animate() {
   requestAnimationFrame(animate);
+  const time = Date.now() * 0.003;
 
   if (engineState === 'WARPING') {
-    // Tighter camera offset for indoors
-    const idealOffset = new THREE.Vector3(0, 3, -6).applyQuaternion(localPlayer.mesh.quaternion).add(localPlayer.mesh.position);
+    const idealOffset = new THREE.Vector3(0, 3, -7).applyQuaternion(localPlayer.mesh.quaternion).add(localPlayer.mesh.position);
     camera.position.lerp(idealOffset, 0.035);
 
     const lookTarget = localPlayer.mesh.position.clone();
@@ -163,6 +207,7 @@ function animate() {
     if (camera.position.distanceTo(idealOffset) < 0.5) {
       engineState = 'INTERACTIVE';
       chatInterface.classList.add('unlocked');
+      socialSign.style.opacity = '1'; // Fade in social links
       setTimeout(spawnNetworkEvent, 1500);
     }
   } else if (engineState === 'INTERACTIVE') {
@@ -171,11 +216,10 @@ function animate() {
 
     const direction = new THREE.Vector3();
     localPlayer.mesh.getWorldDirection(direction);
-    if (keys.w) localPlayer.mesh.position.addScaledVector(direction, 0.15);
-    if (keys.s) localPlayer.mesh.position.addScaledVector(direction, -0.15);
+    if (keys.w) localPlayer.mesh.position.addScaledVector(direction, 0.2);
+    if (keys.s) localPlayer.mesh.position.addScaledVector(direction, -0.2);
 
-    // Tighter 3rd Person Follow for the bunker
-    const idealOffset = new THREE.Vector3(0, 3, -6).applyQuaternion(localPlayer.mesh.quaternion).add(localPlayer.mesh.position);
+    const idealOffset = new THREE.Vector3(0, 3, -7).applyQuaternion(localPlayer.mesh.quaternion).add(localPlayer.mesh.position);
     camera.position.lerp(idealOffset, 0.1);
 
     const lookTarget = localPlayer.mesh.position.clone();
@@ -183,37 +227,47 @@ function animate() {
     camera.lookAt(lookTarget);
   }
 
-  // Float animation for hands
-  const time = Date.now() * 0.003;
+  // Animate Showcase Holograms
+  proj1Holo.rotation.x = time * 0.2;
+  proj1Holo.rotation.y = time * 0.4;
+  proj2Holo.rotation.x = -time * 0.3;
+  proj2Holo.rotation.y = time * 0.5;
+
+  // Render Spatial UI for the Cardboard Sign
+  // We project a point slightly in front of the cardboard's surface so the HTML floats cleanly over it
+  const boardAnchor = new THREE.Vector3(0, 2.5, -11.4);
+  boardAnchor.project(camera);
+  
+  if (boardAnchor.z < 1 && engineState === 'INTERACTIVE') {
+    socialSign.style.display = 'flex';
+    socialSign.style.left = `${(boardAnchor.x * 0.5 + 0.5) * window.innerWidth}px`;
+    socialSign.style.top = `${(boardAnchor.y * -0.5 + 0.5) * window.innerHeight}px`;
+    
+    // Scale UI dynamically based on camera distance (Perspective effect)
+    const distance = camera.position.distanceTo(new THREE.Vector3(0, 2.5, -12));
+    const scale = Math.max(0.3, 10 / distance); 
+    socialSign.style.transform = `translate(-50%, -50%) scale(${scale})`;
+  } else {
+    socialSign.style.display = 'none';
+  }
 
   players.forEach((player) => {
     player.mesh.update(camera);
     player.updateSpatialUI(camera);
 
-    // Jumping and squashing animation for the slime
+    // Jumping Slime Physics
     const slimeCore = player.mesh.levels[0].object.getObjectByName("slimeCore");
-    
     if (slimeCore) {
-      // 1. Calculate absolute sine wave for continuous hopping
       const jumpTrajectory = Math.abs(Math.sin(time * 1.5));
-      slimeCore.position.y = jumpTrajectory * 0.7; // Jump height
+      slimeCore.position.y = jumpTrajectory * 0.7;
 
-      // 2. Base aerodynamic stretch (taller at peak jump)
       const stretch = 1 + jumpTrajectory * 0.2; 
       const squash = 1 - jumpTrajectory * 0.1;
       
-      // 3. Ground impact squish (triggers only when near the floor)
       let impact = 0;
-      if (jumpTrajectory < 0.2) {
-        impact = (0.2 - jumpTrajectory) * 2.0;
-      }
+      if (jumpTrajectory < 0.2) impact = (0.2 - jumpTrajectory) * 2.0;
 
-      // Apply dimensional scaling
-      slimeCore.scale.set(
-        squash + impact,       // X swells on impact
-        stretch - impact,      // Y compresses on impact
-        squash + impact        // Z swells on impact
-      );
+      slimeCore.scale.set(squash + impact, stretch - impact, squash + impact);
     }
 
     if (!player.isLocal) {
