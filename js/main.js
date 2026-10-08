@@ -113,13 +113,23 @@ socialSign.innerHTML = `
 `;
 uiLayer.appendChild(socialSign);
 
-// NEW: Mobile Jump Button
+// Mobile Jump Button
 const mobileJumpBtn = document.createElement('div');
 mobileJumpBtn.style.cssText = `position: fixed; bottom: 2rem; right: 2rem; z-index: 25; opacity: 0; pointer-events: none; transition: opacity 1s ease;`;
 mobileJumpBtn.innerHTML = `
-  <button id="action-jump" style="background: #0f172a; color: #ffffff; width: 70px; height: 70px; border-radius: 50%; border: 4px solid #38bdf8; font-weight: 900; font-size: 14px; box-shadow: 0 8px 20px rgba(0,0,0,0.3); cursor: pointer; user-select: none; -webkit-user-select: none; touch-action: manipulation;">JUMP</button>
+  <button id="action-jump" style="background: rgba(15,23,42,0.8); color: #ffffff; width: 70px; height: 70px; border-radius: 50%; border: 3px solid #38bdf8; font-weight: 900; font-size: 14px; box-shadow: 0 8px 20px rgba(0,0,0,0.3); cursor: pointer; user-select: none; touch-action: manipulation; backdrop-filter: blur(4px);">JUMP</button>
 `;
 document.body.appendChild(mobileJumpBtn);
+
+// NEW: Virtual Analog Joystick
+const joystickZone = document.createElement('div');
+joystickZone.style.cssText = `position: fixed; bottom: 2rem; left: 2rem; width: 120px; height: 120px; background: rgba(15, 23, 42, 0.3); border-radius: 50%; border: 2px solid rgba(56, 189, 248, 0.5); z-index: 25; touch-action: none; display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 1s; backdrop-filter: blur(4px);`;
+
+const joystickKnob = document.createElement('div');
+joystickKnob.style.cssText = `width: 50px; height: 50px; background: rgba(56, 189, 248, 0.8); border-radius: 50%; box-shadow: 0 4px 10px rgba(0,0,0,0.5); pointer-events: none; transform: translate(0px, 0px);`;
+
+joystickZone.appendChild(joystickKnob);
+document.body.appendChild(joystickZone);
 
 // --- ENTITIES ---
 const players = new Map();
@@ -132,25 +142,61 @@ const keys = { w: false, a: false, s: false, d: false };
 window.addEventListener('keydown', (e) => {
   if (document.activeElement === document.getElementById('chat-input') || engineState !== 'INTERACTIVE') return;
   if (keys.hasOwnProperty(e.key.toLowerCase())) keys[e.key.toLowerCase()] = true;
-  
-  // Desktop Jump Trigger
-  if (e.code === 'Space' && !localPlayer.isJumping) {
-    localPlayer.isJumping = true;
-  }
+  if (e.code === 'Space' && !localPlayer.isJumping) localPlayer.isJumping = true;
 });
 
 window.addEventListener('keyup', (e) => {
   if (keys.hasOwnProperty(e.key.toLowerCase())) keys[e.key.toLowerCase()] = false;
 });
 
-// Mobile Jump Trigger
 document.getElementById('action-jump').addEventListener('pointerdown', (e) => {
   e.stopPropagation();
-  if (engineState === 'INTERACTIVE' && !localPlayer.isJumping) {
-    localPlayer.isJumping = true;
-  }
+  if (engineState === 'INTERACTIVE' && !localPlayer.isJumping) localPlayer.isJumping = true;
 });
 
+// Joystick Logic
+let joyActive = false;
+let joyOrigin = { x: 0, y: 0 };
+let joyDelta = { x: 0, y: 0 }; // Normalized -1.0 to 1.0
+
+joystickZone.addEventListener('pointerdown', (e) => {
+  joyActive = true;
+  const rect = joystickZone.getBoundingClientRect();
+  joyOrigin.x = rect.left + rect.width / 2;
+  joyOrigin.y = rect.top + rect.height / 2;
+  updateJoystick(e);
+});
+
+window.addEventListener('pointermove', (e) => {
+  if (!joyActive) return;
+  updateJoystick(e);
+});
+
+window.addEventListener('pointerup', () => {
+  joyActive = false;
+  joyDelta = { x: 0, y: 0 };
+  joystickKnob.style.transform = `translate(0px, 0px)`;
+});
+
+function updateJoystick(e) {
+  let dx = e.clientX - joyOrigin.x;
+  let dy = e.clientY - joyOrigin.y;
+  
+  const maxDist = 35; // Maximum pixel distance the knob can travel
+  const dist = Math.sqrt(dx * dx + dy * dy);
+  
+  if (dist > maxDist) {
+    dx = (dx / dist) * maxDist;
+    dy = (dy / dist) * maxDist;
+  }
+  
+  joystickKnob.style.transform = `translate(${dx}px, ${dy}px)`;
+  
+  joyDelta.x = dx / maxDist;
+  joyDelta.y = dy / maxDist;
+}
+
+// --- TRANSITIONS ---
 const introScreen = document.getElementById('intro-screen');
 const chatInterface = document.getElementById('chat-interface');
 
@@ -168,7 +214,7 @@ function spawnNetworkEvent() {
   remotePlayer.targetPos.set(-8, 0, -5);
   players.set(remoteId, remotePlayer);
 
-  setTimeout(() => remotePlayer.say('Press Spacebar or the button to jump!'), 1000);
+  setTimeout(() => remotePlayer.say('Use the joystick to move around!'), 1000);
   setTimeout(() => remotePlayer.targetPos.set(0, 0, -8), 3500); 
 }
 
@@ -209,17 +255,31 @@ function animate() {
       chatInterface.classList.add('unlocked');
       socialSign.style.opacity = '1'; 
       mobileJumpBtn.style.opacity = '1';
-      mobileJumpBtn.style.pointerEvents = 'auto'; // Enable button interaction
+      mobileJumpBtn.style.pointerEvents = 'auto';
+      joystickZone.style.opacity = '1';
+      joystickZone.style.pointerEvents = 'auto'; // Unlock joystick
       setTimeout(spawnNetworkEvent, 1500);
     }
   } else if (engineState === 'INTERACTIVE') {
-    if (keys.a) localPlayer.mesh.rotation.y += 0.05;
-    if (keys.d) localPlayer.mesh.rotation.y -= 0.05;
+    // Physics & Velocity Calculation (Keyboard + Joystick)
+    let rotVelocity = 0;
+    let moveVelocity = 0;
+
+    // Keyboard
+    if (keys.a) rotVelocity += 0.05;
+    if (keys.d) rotVelocity -= 0.05;
+    if (keys.w) moveVelocity += 0.2;
+    if (keys.s) moveVelocity -= 0.2;
+
+    // Joystick (Negative Y on screen is forward in 3D)
+    rotVelocity -= joyDelta.x * 0.05;
+    moveVelocity -= joyDelta.y * 0.2;
+
+    localPlayer.mesh.rotation.y += rotVelocity;
 
     const direction = new THREE.Vector3();
     localPlayer.mesh.getWorldDirection(direction);
-    if (keys.w) localPlayer.mesh.position.addScaledVector(direction, 0.2);
-    if (keys.s) localPlayer.mesh.position.addScaledVector(direction, -0.2);
+    localPlayer.mesh.position.addScaledVector(direction, moveVelocity);
 
     const idealOffset = new THREE.Vector3(0, 3, -7).applyQuaternion(localPlayer.mesh.quaternion).add(localPlayer.mesh.position);
     camera.position.lerp(idealOffset, 0.1);
@@ -249,29 +309,27 @@ function animate() {
     socialSign.style.display = 'none';
   }
 
-  // --- STATE-DRIVEN SLIME KINEMATICS ---
   players.forEach((player) => {
     player.mesh.update(camera);
     player.updateSpatialUI(camera);
 
     const slimeCore = player.mesh.levels[0].object.getObjectByName("slimeCore");
     if (slimeCore) {
-      // Evaluate Movement State
-      const isLocalMoving = (player.isLocal) && (keys.w || keys.s || keys.a || keys.d);
+      // Evaluate Movement State (Now includes joystick checks)
+      const isLocalMoving = (player.isLocal) && (keys.w || keys.s || keys.a || keys.d || joyDelta.x !== 0 || joyDelta.y !== 0);
       const isRemoteMoving = (!player.isLocal) && (player.mesh.position.distanceTo(player.targetPos) > 0.02);
 
       if (player.isJumping) {
-        player.animTime += 0.12;     // Air time duration
-        player.jumpIntensity = 2.0;  // Large vertical jump
+        player.animTime += 0.12;     
+        player.jumpIntensity = 2.0;  
         if (player.animTime >= Math.PI) {
-          player.animTime = 0;       // Reset to ground
+          player.animTime = 0;       
           player.isJumping = false;
         }
       } else if (isLocalMoving || isRemoteMoving) {
-        player.animTime += 0.25;     // Quick pacing
-        player.jumpIntensity = 0.5;  // Small walking hops
+        player.animTime += 0.25;     
+        player.jumpIntensity = 0.5;  
       } else {
-        // Smoothly settle back to flat surface when stopped
         if (player.animTime > 0 && player.animTime < Math.PI) {
           player.animTime += 0.25;
           if (player.animTime >= Math.PI) player.animTime = 0;
