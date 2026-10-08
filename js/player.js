@@ -74,6 +74,27 @@ export class Player {
     }
   }
 
+  swapCharacter(newType) {
+    if (this.type === newType) return;
+    this.type = newType;
+    this.mesh.remove(this.core);
+    this.buildCharacter();
+  }
+
+  playShowcaseAnimation(time) {
+    if (this.type === 'slime') {
+      const jumpTrajectory = Math.abs(Math.sin(time * 2.5));
+      this.core.position.y = 0.4 + jumpTrajectory * 0.5;
+      this.core.scale.set(1 - jumpTrajectory * 0.1, 1 + jumpTrajectory * 0.2, 1 - jumpTrajectory * 0.1);
+      this.mesh.rotation.y = time * 0.5; // Slow rotation
+    } else if (this.type === 'mecha') {
+      this.core.position.y = Math.sin(time * 3) * 0.1;
+      this.lHand.position.z = 0.15 + Math.sin(time * 5) * 0.1;
+      this.rHand.position.z = 0.15 + Math.sin(time * 5 + Math.PI) * 0.1;
+      this.mesh.rotation.y = time * 0.5;
+    }
+  }
+
   // --- UNIQUE KINEMATICS ---
   updateAnimation(time, isMoving) {
     if (this.type === 'slime') {
