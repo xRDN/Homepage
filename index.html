@@ -3,108 +3,16 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ERDIAN | Spatial Engine</title>
+  <title>ERDIAN | Multiplayer Prototype</title>
   <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
       overflow: hidden;
       background: #020205;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       user-select: none;
-      -webkit-user-select: none;
     }
-
-    /* 2D CINEMATIC INTRO */
-    #intro-screen {
-      position: fixed;
-      inset: 0;
-      z-index: 50;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      background: radial-gradient(circle at center, #090918 0%, #020205 100%);
-      cursor: pointer;
-      transition: opacity 1.2s cubic-bezier(0.16, 1, 0.3, 1), visibility 1.2s;
-    }
-
-    #intro-screen.hidden {
-      opacity: 0;
-      visibility: hidden;
-      pointer-events: none;
-    }
-
-    .intro-content {
-      text-align: center;
-      padding: 0 1.5rem;
-    }
-
-    .intro-tag {
-      font-size: 0.75rem;
-      letter-spacing: 0.3em;
-      text-transform: uppercase;
-      color: #6366f1;
-      margin-bottom: 0.8rem;
-      font-weight: 600;
-    }
-
-    .intro-title {
-      font-size: clamp(3.2rem, 9vw, 7.5rem);
-      font-weight: 900;
-      letter-spacing: 0.22em;
-      text-transform: uppercase;
-      background: linear-gradient(135deg, #ffffff 0%, #818cf8 50%, #c084fc 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      margin-bottom: 0.75rem;
-      filter: drop-shadow(0 0 35px rgba(99, 102, 241, 0.35));
-    }
-
-    .intro-subtitle {
-      font-size: clamp(0.85rem, 1.8vw, 1.1rem);
-      color: #94a3b8;
-      letter-spacing: 0.12em;
-      font-weight: 300;
-      max-width: 520px;
-      margin: 0 auto 3rem;
-      line-height: 1.6;
-    }
-
-    .intro-cta {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.6rem;
-      font-size: 0.8rem;
-      letter-spacing: 0.2em;
-      text-transform: uppercase;
-      color: #cbd5e1;
-      padding: 0.75rem 1.75rem;
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      border-radius: 9999px;
-      background: rgba(255, 255, 255, 0.03);
-      backdrop-filter: blur(8px);
-      animation: float-pulse 2.5s infinite ease-in-out;
-    }
-
-    @keyframes float-pulse {
-      0%, 100% {
-        opacity: 0.6;
-        transform: translateY(0);
-        border-color: rgba(99, 102, 241, 0.25);
-      }
-      50% {
-        opacity: 1;
-        transform: translateY(-3px);
-        border-color: rgba(168, 85, 247, 0.6);
-        box-shadow: 0 0 25px rgba(168, 85, 247, 0.25);
-      }
-    }
-
-    /* 3D CANVAS & HUD */
+    
     canvas#webgl {
       position: fixed;
       inset: 0;
@@ -113,326 +21,343 @@
       outline: none;
     }
 
-    .hud {
-      position: absolute;
-      top: 2rem;
-      left: 2rem;
+    /* Spatial HTML UI Container */
+    #ui-layer {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
       z-index: 10;
+    }
+
+    /* Floating Chat Bubbles */
+    .chat-bubble {
+      position: absolute;
+      background: rgba(15, 23, 42, 0.85);
+      border: 1px solid rgba(99, 102, 241, 0.4);
+      color: #f8fafc;
+      padding: 0.5rem 0.75rem;
+      border-radius: 8px;
+      font-size: 0.75rem;
+      font-weight: 500;
+      backdrop-filter: blur(4px);
+      transform: translate(-50%, -100%); /* Center above character */
+      margin-top: -15px; /* Offset above head */
+      white-space: nowrap;
       pointer-events: none;
       opacity: 0;
-      transition: opacity 1.8s ease;
+      transition: opacity 0.2s;
     }
+    .chat-bubble.visible { opacity: 1; }
 
-    .hud.visible {
-      opacity: 1;
-    }
-
-    .hud-badge {
-      display: inline-block;
+    /* Player Nameplates */
+    .nameplate {
+      position: absolute;
+      color: #94a3b8;
       font-size: 0.65rem;
       font-weight: 700;
-      letter-spacing: 0.2em;
-      color: #a855f7;
+      letter-spacing: 0.1em;
       text-transform: uppercase;
-      margin-bottom: 0.3rem;
+      transform: translate(-50%, -100%);
+      margin-top: 5px;
     }
 
-    .hud h2 {
-      font-size: 1.2rem;
-      font-weight: 800;
-      letter-spacing: 0.15em;
-      color: #ffffff;
+    /* Game HUD */
+    #chat-interface {
+      position: fixed;
+      bottom: 2rem;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 0.5rem;
+      z-index: 20;
     }
-
-    .hud p {
-      font-size: 0.75rem;
-      color: #64748b;
-      margin-top: 0.25rem;
-      letter-spacing: 0.05em;
+    
+    input[type="text"] {
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      color: white;
+      padding: 0.75rem 1rem;
+      border-radius: 99px;
+      width: 300px;
+      outline: none;
+      backdrop-filter: blur(10px);
+    }
+    input[type="text"]:focus { border-color: #6366f1; }
+    
+    button {
+      background: #6366f1;
+      color: white;
+      border: none;
+      padding: 0 1.5rem;
+      border-radius: 99px;
+      font-weight: 600;
+      cursor: pointer;
     }
   </style>
 
-  <!-- Modern Module Imports with Addons -->
   <script type="importmap">
     {
       "imports": {
-        "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
-        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+        "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js"
       }
     }
   </script>
 </head>
 <body>
 
-  <!-- 2D Overlay -->
-  <div id="intro-screen">
-    <div class="intro-content">
-      <div class="intro-tag">Project Initialization</div>
-      <h1 class="intro-title">ERDIAN</h1>
-      <p class="intro-subtitle">Autonomous Real-Time Shading & Neural Particle Dynamics</p>
-      <div class="intro-cta">Press anywhere to enter</div>
-    </div>
-  </div>
-
-  <!-- Operational HUD -->
-  <div class="hud" id="hud">
-    <span class="hud-badge">Online</span>
-    <h2>ERDIAN CORE</h2>
-    <p>Orbit active • Left click drag • Pinch / Scroll zoom</p>
-  </div>
-
-  <!-- Render Surface -->
+  <!-- The 3D Canvas -->
   <canvas id="webgl"></canvas>
+
+  <!-- The 2D Spatial UI Layer -->
+  <div id="ui-layer"></div>
+
+  <!-- Chat Input -->
+  <div id="chat-interface">
+    <input type="text" id="chat-input" placeholder="Press Enter to chat..." autocomplete="off">
+    <button id="chat-send">Send</button>
+  </div>
 
   <script type="module">
     import * as THREE from 'three';
-    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-    import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
-    import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
-    import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
-    import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
-    // --- SYNTHESIZED ATMOSPHERIC AUDIO (WEB AUDIO API) ---
-    function triggerAtmosphereSwell() {
-      try {
-        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        if (audioCtx.state === 'suspended') {
-          audioCtx.resume();
+    // --- 1. CORE ENGINE ---
+    const canvas = document.querySelector('#webgl');
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.FogExp2(0x020205, 0.04);
+
+    const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 200);
+    
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    
+    // Environment
+    scene.add(new THREE.AmbientLight(0xffffff, 0.3));
+    const dirLight = new THREE.DirectionalLight(0x6366f1, 2);
+    dirLight.position.set(5, 10, 5);
+    scene.add(dirLight);
+
+    const grid = new THREE.GridHelper(50, 50, 0x1e1b4b, 0x0f172a);
+    scene.add(grid);
+
+    // --- 2. PLAYER & MULTIPLAYER ARCHITECTURE ---
+    const uiLayer = document.getElementById('ui-layer');
+    const players = new Map(); // Stores all active clients
+
+    // Reusable materials for optimization
+    const matHigh = new THREE.MeshStandardMaterial({ color: 0x6366f1, roughness: 0.2 });
+    const matLow = new THREE.MeshBasicMaterial({ color: 0x4f46e5 });
+
+    class Player {
+      constructor(id, isLocal = false) {
+        this.id = id;
+        this.isLocal = isLocal;
+        
+        // Target positioning for network interpolation (smoothing lag)
+        this.targetPos = new THREE.Vector3();
+        this.targetRot = 0;
+
+        // Create LOD (Level of Detail) Mesh
+        this.mesh = new THREE.LOD();
+        
+        // High-res geometry (Close up)
+        const geoHigh = new THREE.CapsuleGeometry(0.5, 1, 16, 16);
+        const meshHigh = new THREE.Mesh(geoHigh, matHigh);
+        meshHigh.position.y = 1; // Stand on ground
+        
+        // Add a "visor" to show forward direction
+        const visor = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.2, 0.4), new THREE.MeshBasicMaterial({color: 0x000000}));
+        visor.position.set(0, 0.4, 0.4);
+        meshHigh.add(visor);
+
+        // Low-res geometry (Far away)
+        const geoLow = new THREE.BoxGeometry(1, 2, 1);
+        const meshLow = new THREE.Mesh(geoLow, matLow);
+        meshLow.position.y = 1;
+
+        // Add levels to LOD (Distance thresholds)
+        this.mesh.addLevel(meshHigh, 0);   // Under 15m: Render Capsule
+        this.mesh.addLevel(meshLow, 15);   // Over 15m: Render Box
+        
+        scene.add(this.mesh);
+
+        // Create Spatial UI Elements
+        this.chatElement = document.createElement('div');
+        this.chatElement.className = 'chat-bubble';
+        
+        this.nameElement = document.createElement('div');
+        this.nameElement.className = 'nameplate';
+        this.nameElement.innerText = isLocal ? "You" : `Visitor_${id.substring(0,4)}`;
+        
+        uiLayer.appendChild(this.chatElement);
+        uiLayer.appendChild(this.nameElement);
+        
+        this.chatTimeout = null;
+      }
+
+      say(message) {
+        this.chatElement.innerText = message;
+        this.chatElement.classList.add('visible');
+        clearTimeout(this.chatTimeout);
+        this.chatTimeout = setTimeout(() => {
+          this.chatElement.classList.remove('visible');
+        }, 4000);
+      }
+
+      updateSpatialUI(camera) {
+        // Project 3D head position to 2D screen coordinates
+        const headPos = this.mesh.position.clone();
+        headPos.y += 2.2; // Top of the capsule
+        
+        headPos.project(camera);
+
+        // Convert projection to CSS pixels
+        const x = (headPos.x *  .5 + .5) * window.innerWidth;
+        const y = (headPos.y * -.5 + .5) * window.innerHeight;
+
+        // Hide UI if player is behind camera
+        if (headPos.z > 1) {
+          this.chatElement.style.display = 'none';
+          this.nameElement.style.display = 'none';
+          return;
         }
 
-        const masterGain = audioCtx.createGain();
-        masterGain.gain.setValueAtTime(0.001, audioCtx.currentTime);
-        masterGain.gain.exponentialRampToValueAtTime(0.3, audioCtx.currentTime + 1.2);
-        masterGain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 5.0);
-        masterGain.connect(audioCtx.destination);
-
-        // Sub harmonic oscillator
-        const subOsc = audioCtx.createOscillator();
-        subOsc.type = 'sine';
-        subOsc.frequency.setValueAtTime(55, audioCtx.currentTime); // A1 note
-        subOsc.frequency.exponentialRampToValueAtTime(110, audioCtx.currentTime + 3.0);
-        subOsc.connect(masterGain);
-
-        // Shimmer oscillator
-        const shimmerOsc = audioCtx.createOscillator();
-        shimmerOsc.type = 'triangle';
-        shimmerOsc.frequency.setValueAtTime(220, audioCtx.currentTime);
-        shimmerOsc.frequency.exponentialRampToValueAtTime(440, audioCtx.currentTime + 2.5);
-
-        // Filter envelope
-        const filter = audioCtx.createBiquadFilter();
-        filter.type = 'lowpass';
-        filter.frequency.setValueAtTime(300, audioCtx.currentTime);
-        filter.frequency.exponentialRampToValueAtTime(2400, audioCtx.currentTime + 1.8);
-
-        shimmerOsc.connect(filter);
-        filter.connect(masterGain);
-
-        subOsc.start();
-        shimmerOsc.start();
-        subOsc.stop(audioCtx.currentTime + 5.2);
-        shimmerOsc.stop(audioCtx.currentTime + 5.2);
-      } catch (err) {
-        // Audio will fail silently if blocked by hardware policy without crashing 3D
+        this.chatElement.style.display = 'block';
+        this.nameElement.style.display = 'block';
+        this.chatElement.style.left = `${x}px`;
+        this.chatElement.style.top = `${y}px`;
+        this.nameElement.style.left = `${x}px`;
+        this.nameElement.style.top = `${y}px`;
       }
     }
 
-    // --- 1. RENDERER & SCENE SETUP ---
-    const canvas = document.querySelector('#webgl');
-    const scene = new THREE.Scene();
-    scene.fog = new THREE.FogExp2(0x020205, 0.025);
+    // Initialize Local Player
+    const localId = "local_" + Math.floor(Math.random() * 1000);
+    const localPlayer = new Player(localId, true);
+    players.set(localId, localPlayer);
 
-    // Initial camera position far out in deep space for warp sequence
-    const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 200);
-    camera.position.set(0, 0, 42);
-
-    const renderer = new THREE.WebGLRenderer({
-      canvas: canvas,
-      antialias: true,
-      powerPreference: "high-performance"
+    // --- 3. INPUT & THIRD PERSON CAMERA ---
+    const keys = { w: false, a: false, s: false, d: false };
+    
+    window.addEventListener('keydown', (e) => {
+      if (document.activeElement === document.getElementById('chat-input')) return;
+      if (keys.hasOwnProperty(e.key.toLowerCase())) keys[e.key.toLowerCase()] = true;
     });
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.1;
-
-    // --- 2. POST-PROCESSING (UNREAL BLOOM) ---
-    const renderScene = new RenderPass(scene, camera);
-    const bloomPass = new UnrealBloomPass(
-      new THREE.Vector2(window.innerWidth, window.innerHeight),
-      1.6,  // Bloom Strength
-      0.4,  // Radius
-      0.15  // Threshold
-    );
-
-    const outputPass = new OutputPass();
-
-    const composer = new EffectComposer(renderer);
-    composer.addPass(renderScene);
-    composer.addPass(bloomPass);
-    composer.addPass(outputPass);
-
-    // --- 3. CONTROLS ---
-    const controls = new OrbitControls(camera, canvas);
-    controls.enableDamping = true;
-    controls.dampingFactor = 0.05;
-    controls.maxDistance = 15;
-    controls.minDistance = 2.5;
-    controls.enabled = false; // Kept locked until fly-in sequence completes
-
-    // --- 4. LIGHTING ---
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.2);
-    scene.add(ambientLight);
-
-    const coreLight = new THREE.PointLight(0xa855f7, 8, 20);
-    coreLight.position.set(0, 0, 0);
-    scene.add(coreLight);
-
-    const blueRim = new THREE.DirectionalLight(0x38bdf8, 3.5);
-    blueRim.position.set(8, 6, 5);
-    scene.add(blueRim);
-
-    // --- 5. DUAL-LAYER CORE ARTIFACT ---
-    const coreGroup = new THREE.Group();
-    scene.add(coreGroup);
-
-    // Inner Glowing Core
-    const innerGeo = new THREE.IcosahedronGeometry(0.85, 4);
-    const innerMat = new THREE.MeshStandardMaterial({
-      color: 0x9333ea,
-      emissive: 0x6366f1,
-      emissiveIntensity: 1.4,
-      roughness: 0.1,
-      metalness: 0.9
+    window.addEventListener('keyup', (e) => {
+      if (keys.hasOwnProperty(e.key.toLowerCase())) keys[e.key.toLowerCase()] = false;
     });
-    const innerMesh = new THREE.Mesh(innerGeo, innerMat);
-    coreGroup.add(innerMesh);
 
-    // Outer Wireframe Lattice
-    const outerGeo = new THREE.TorusKnotGeometry(1.2, 0.22, 160, 24);
-    const outerMat = new THREE.MeshStandardMaterial({
-      color: 0x0ea5e9,
-      emissive: 0x0284c7,
-      emissiveIntensity: 0.6,
-      wireframe: true,
-      roughness: 0.2,
-      metalness: 0.8
-    });
-    const outerMesh = new THREE.Mesh(outerGeo, outerMat);
-    coreGroup.add(outerMesh);
+    const moveSpeed = 0.1;
+    const rotSpeed = 0.05;
 
-    // --- 6. NEBULA PARTICLE GALAXY ---
-    const particleCount = 2500;
-    const positions = new Float32Array(particleCount * 3);
-    const colors = new Float32Array(particleCount * 3);
+    function handleLocalMovement() {
+      // 1. Update Rotation
+      if (keys.a) localPlayer.mesh.rotation.y += rotSpeed;
+      if (keys.d) localPlayer.mesh.rotation.y -= rotSpeed;
 
-    const color1 = new THREE.Color(0x38bdf8);
-    const color2 = new THREE.Color(0xc084fc);
+      // 2. Update Position (forward/backward along local Z axis)
+      const direction = new THREE.Vector3();
+      localPlayer.mesh.getWorldDirection(direction);
 
-    for (let i = 0; i < particleCount * 3; i += 3) {
-      // Spatial disk distribution
-      const radius = 2 + Math.random() * 18;
-      const theta = Math.random() * Math.PI * 2;
-      const verticalSpread = (Math.random() - 0.5) * 6;
+      if (keys.w) {
+        localPlayer.mesh.position.addScaledVector(direction, moveSpeed);
+      }
+      if (keys.s) {
+        localPlayer.mesh.position.addScaledVector(direction, -moveSpeed);
+      }
 
-      positions[i] = Math.cos(theta) * radius;
-      positions[i + 1] = verticalSpread;
-      positions[i + 2] = Math.sin(theta) * radius;
+      // 3. Third-Person Camera Follow (Damped)
+      // Calculate ideal camera position (behind and above player)
+      const idealOffset = new THREE.Vector3(0, 3, -6);
+      idealOffset.applyQuaternion(localPlayer.mesh.quaternion);
+      idealOffset.add(localPlayer.mesh.position);
 
-      const mixedColor = color1.clone().lerp(color2, Math.random());
-      colors[i] = mixedColor.r;
-      colors[i + 1] = mixedColor.g;
-      colors[i + 2] = mixedColor.b;
+      // Lerp camera to ideal position for smooth follow
+      camera.position.lerp(idealOffset, 0.1);
+      
+      // Look at slightly above player's head
+      const lookAtPos = localPlayer.mesh.position.clone();
+      lookAtPos.y += 1.5;
+      camera.lookAt(lookAtPos);
     }
 
-    const particleGeo = new THREE.BufferGeometry();
-    particleGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-    particleGeo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    // --- 4. CHAT SYSTEM ---
+    const chatInput = document.getElementById('chat-input');
+    const chatSend = document.getElementById('chat-send');
 
-    const particleMat = new THREE.PointsMaterial({
-      size: 0.055,
-      vertexColors: true,
-      transparent: true,
-      opacity: 0.85,
-      blending: THREE.AdditiveBlending
-    });
-
-    const particleField = new THREE.Points(particleGeo, particleMat);
-    scene.add(particleField);
-
-    // --- 7. CAMERA FLY-IN SEQUENCE ---
-    let warping = false;
-    let targetZ = 4.8;
-    let targetY = 1.2;
-
-    const introScreen = document.getElementById('intro-screen');
-    const hud = document.getElementById('hud');
-
-    function executeEntrance() {
-      if (warping) return;
-      warping = true;
-
-      // Audio trigger
-      triggerAtmosphereSwell();
-
-      // UI Transition
-      introScreen.classList.add('hidden');
-      setTimeout(() => hud.classList.add('visible'), 600);
+    function sendChat() {
+      const text = chatInput.value.trim();
+      if (!text) return;
+      
+      localPlayer.say(text);
+      
+      // IN A REAL APP: socket.send({ type: 'chat', msg: text })
+      
+      chatInput.value = '';
+      chatInput.blur();
     }
 
-    introScreen.addEventListener('pointerdown', executeEntrance, { passive: true });
+    chatSend.addEventListener('click', sendChat);
+    chatInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') sendChat();
+    });
 
-    // --- 8. RESIZE ADAPTATION ---
+    // --- 5. NETWORK SIMULATOR (Faking WebSockets) ---
+    // This simulates data arriving from other players over the internet
+    function simulateIncomingNetworkData() {
+      // Spawn a fake visitor
+      const remoteId = "remote_992";
+      if (!players.has(remoteId)) {
+        const remotePlayer = new Player(remoteId);
+        remotePlayer.mesh.position.set(5, 0, 5);
+        remotePlayer.targetPos.set(5, 0, 5);
+        players.set(remoteId, remotePlayer);
+        
+        setTimeout(() => remotePlayer.say("Whoa, where am I?"), 2000);
+        setTimeout(() => remotePlayer.targetPos.set(2, 0, -2), 4000);
+        setTimeout(() => remotePlayer.say("Cool rendering engine."), 6000);
+      }
+    }
+    
+    setTimeout(simulateIncomingNetworkData, 1000);
+
+    // --- 6. MAIN RENDER LOOP ---
     window.addEventListener('resize', () => {
       camera.aspect = window.innerWidth / window.innerHeight;
       camera.updateProjectionMatrix();
       renderer.setSize(window.innerWidth, window.innerHeight);
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-      composer.setSize(window.innerWidth, window.innerHeight);
     });
 
-    // --- 9. RENDER & PHYSICS LOOP ---
-    const clock = new THREE.Clock();
+    function animate() {
+      requestAnimationFrame(animate);
 
-    function renderLoop() {
-      requestAnimationFrame(renderLoop);
+      // Process movement for local player
+      handleLocalMovement();
 
-      const elapsedTime = clock.getElapsedTime();
+      // Process Networked Players
+      players.forEach((player) => {
+        // Update LODs based on distance to camera
+        player.mesh.update(camera);
+        
+        // Project 3D position to HTML UI
+        player.updateSpatialUI(camera);
 
-      // Warp interpolation execution
-      if (warping) {
-        camera.position.z += (targetZ - camera.position.z) * 0.045;
-        camera.position.y += (targetY - camera.position.y) * 0.045;
-
-        // Give control to user when camera nears arrival
-        if (Math.abs(camera.position.z - targetZ) < 0.2 && !controls.enabled) {
-          controls.enabled = true;
-          controls.target.set(0, 0, 0);
+        // Network Smoothing: Glide remote players to their target coordinates
+        if (!player.isLocal) {
+          player.mesh.position.lerp(player.targetPos, 0.05);
+          // (In a real app, you would also lerp player.targetRot)
+          
+          // Make remote players look at the local player (just for this demo)
+          player.mesh.lookAt(localPlayer.mesh.position.x, player.mesh.position.y, localPlayer.mesh.position.z);
         }
-      }
+      });
 
-      // Counter-rotating artifact elements
-      innerMesh.rotation.y = -elapsedTime * 0.35;
-      innerMesh.rotation.z = elapsedTime * 0.2;
+      // IN A REAL APP: socket.send({ x: localPlayer.x, z: localPlayer.z })
 
-      outerMesh.rotation.y = elapsedTime * 0.25;
-      outerMesh.rotation.x = elapsedTime * 0.15;
-
-      // Pulse emissive radiance
-      innerMat.emissiveIntensity = 1.2 + Math.sin(elapsedTime * 3.0) * 0.5;
-
-      // Particle orbital rotation
-      particleField.rotation.y = elapsedTime * 0.035;
-
-      if (controls.enabled) {
-        controls.update();
-      }
-
-      // Render through the Bloom Composer instead of standard renderer
-      composer.render();
+      renderer.render(scene, camera);
     }
-
-    renderLoop();
+    
+    animate();
   </script>
 </body>
 </html>
