@@ -10,71 +10,68 @@ export class Player {
 
     this.mesh = new THREE.LOD();
     
-    // --- HIGH DETAIL CHARACTER (CHIBI-MECHA) ---
+    // --- HIGH DETAIL CHARACTER (ANIMAL SLIME) ---
     const groupHigh = new THREE.Group();
+    groupHigh.name = "slimeCore"; // Named for the physics loop
 
-    // 1. Oversized Head (Classic Chibi 1:1 Ratio - Ceramic White)
-    const headGeo = new THREE.SphereGeometry(0.45, 32, 32);
-    const headMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.1, metalness: 0.2 });
-    const head = new THREE.Mesh(headGeo, headMat);
-    head.position.y = 0.9;
-    
-    // 2. Digital Faceplate (Glossy Black)
-    const screenGeo = new THREE.CapsuleGeometry(0.18, 0.35, 16, 16);
-    const screenMat = new THREE.MeshStandardMaterial({ color: 0x020202, roughness: 0.0, metalness: 0.9 });
-    const screen = new THREE.Mesh(screenGeo, screenMat);
-    screen.rotation.z = Math.PI / 2;
-    screen.position.set(0, 0.9, 0.32);
+    // Advanced Jelly Material (Subsurface scattering look)
+    const slimeMat = new THREE.MeshPhysicalMaterial({
+      color: 0x06b6d4,       // Cyan base
+      metalness: 0.1,
+      roughness: 0.2,
+      transmission: 0.6,     // Glass-like translucency
+      thickness: 0.5,        // Light refraction depth
+      clearcoat: 1.0,        // Wet, shiny exterior
+      clearcoatRoughness: 0.1
+    });
 
-    // 3. Expressive Glowing Eyes (Cyan Dots)
-    const eyeGeo = new THREE.SphereGeometry(0.06, 16, 16);
-    const eyeMat = new THREE.MeshStandardMaterial({ color: 0x000000, emissive: 0x06b6d4, emissiveIntensity: 2.5 });
+    // 1. Base Slime Body (Pivot moved to bottom for proper squashing)
+    const bodyGeo = new THREE.SphereGeometry(0.4, 32, 32);
+    bodyGeo.translate(0, 0.4, 0); 
+    const body = new THREE.Mesh(bodyGeo, slimeMat);
+
+    // 2. Animal Ears (Cat shape)
+    const earGeo = new THREE.ConeGeometry(0.12, 0.25, 16);
+    earGeo.translate(0, 0.125, 0); // Pivot at the base of the ear
+
+    const leftEar = new THREE.Mesh(earGeo, slimeMat);
+    leftEar.position.set(0.2, 0.7, 0);
+    leftEar.rotation.set(-0.1, 0, -0.3);
+
+    const rightEar = new THREE.Mesh(earGeo, slimeMat);
+    rightEar.position.set(-0.2, 0.7, 0);
+    rightEar.rotation.set(-0.1, 0, 0.3);
+
+    // 3. Cute Dot Eyes
+    const eyeGeo = new THREE.SphereGeometry(0.05, 16, 16);
+    const eyeMat = new THREE.MeshBasicMaterial({ color: 0x0f172a }); // Dark navy
     
     const leftEye = new THREE.Mesh(eyeGeo, eyeMat);
-    leftEye.position.set(0.14, 0.92, 0.48);
+    leftEye.position.set(0.15, 0.45, 0.35);
     
     const rightEye = new THREE.Mesh(eyeGeo, eyeMat);
-    rightEye.position.set(-0.14, 0.92, 0.48);
+    rightEye.position.set(-0.15, 0.45, 0.35);
 
-    // 4. Mecha Cat Ears (Cool but cute silhouette)
-    const earGeo = new THREE.ConeGeometry(0.1, 0.2, 16);
-    const earMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.4, metalness: 0.8 });
+    // 4. Pink Blush Cheeks
+    const blushGeo = new THREE.SphereGeometry(0.06, 16, 16);
+    blushGeo.scale(1, 0.5, 0.2); // Flatten into ovals
+    const blushMat = new THREE.MeshBasicMaterial({ color: 0xf43f5e }); // Rose pink
     
-    const leftEar = new THREE.Mesh(earGeo, earMat);
-    leftEar.position.set(0.25, 1.25, 0);
-    leftEar.rotation.z = -0.25;
+    const leftBlush = new THREE.Mesh(blushGeo, blushMat);
+    leftBlush.position.set(0.25, 0.35, 0.35);
     
-    const rightEar = new THREE.Mesh(earGeo, earMat);
-    rightEar.position.set(-0.25, 1.25, 0);
-    rightEar.rotation.z = 0.25;
+    const rightBlush = new THREE.Mesh(blushGeo, blushMat);
+    rightBlush.position.set(-0.25, 0.35, 0.35);
 
-    // 5. Tiny Stubby Body (Dark Metal)
-    const bodyGeo = new THREE.CapsuleGeometry(0.22, 0.15, 16, 16);
-    const body = new THREE.Mesh(bodyGeo, earMat);
-    body.position.y = 0.35;
-
-    // 6. Floating Paws
-    const handGeo = new THREE.SphereGeometry(0.1, 16, 16);
-    const lHand = new THREE.Mesh(handGeo, headMat);
-    lHand.position.set(0.32, 0.4, 0.15);
-    lHand.name = "lHand"; // Named for safe physics targeting
-    
-    const rHand = new THREE.Mesh(handGeo, headMat);
-    rHand.position.set(-0.32, 0.4, 0.15);
-    rHand.name = "rHand";
-
-    // 7. Mini Thruster Backpack
-    const packGeo = new THREE.BoxGeometry(0.2, 0.25, 0.12);
-    const pack = new THREE.Mesh(packGeo, headMat);
-    pack.position.set(0, 0.4, -0.25);
-
-    groupHigh.add(head, screen, leftEye, rightEye, leftEar, rightEar, body, lHand, rHand, pack);
+    // Assemble the slime
+    body.add(leftEar, rightEar, leftEye, rightEye, leftBlush, rightBlush);
+    groupHigh.add(body);
 
     // --- LOW DETAIL CHARACTER (For Distant Optimization) ---
-    const geoLow = new THREE.BoxGeometry(0.6, 1.2, 0.6);
-    const matLow = new THREE.MeshBasicMaterial({ color: 0x0f172a });
+    const geoLow = new THREE.BoxGeometry(0.6, 0.6, 0.6);
+    const matLow = new THREE.MeshBasicMaterial({ color: 0x06b6d4 });
     const meshLow = new THREE.Mesh(geoLow, matLow);
-    meshLow.position.y = 0.6;
+    meshLow.position.y = 0.3;
 
     this.mesh.addLevel(groupHigh, 0);
     this.mesh.addLevel(meshLow, 25);
@@ -104,7 +101,7 @@ export class Player {
 
   updateSpatialUI(camera) {
     const headPos = this.mesh.position.clone();
-    headPos.y += 1.5; // Lowered to match the new compact height
+    headPos.y += 1.2; // Adjusted for shorter slime height
     headPos.project(camera);
 
     const x = (headPos.x * 0.5 + 0.5) * window.innerWidth;
