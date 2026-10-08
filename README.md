@@ -1,7 +1,16 @@
-# My Github Page
+# ABOUT ME
 
-To test the extend of static site.
+To test the extend of static web.
 
 ### Features
 
-- Three.JS
+- Landing screen
+- Object showcase and picker
+- Animation
+- Joystick and movement
+- Chat
+
+
+### Stack
+
+- THREE.JS
