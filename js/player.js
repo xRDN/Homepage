@@ -8,31 +8,33 @@ export class Player {
     this.isLocal = isLocal;
     this.targetPos = new THREE.Vector3();
 
+    // --- NEW: Physics & Animation State ---
+    this.animTime = 0;
+    this.isJumping = false;
+    this.jumpIntensity = 0.5;
+
     this.mesh = new THREE.LOD();
     
     // --- HIGH DETAIL CHARACTER (ANIMAL SLIME) ---
     const groupHigh = new THREE.Group();
-    groupHigh.name = "slimeCore"; // Named for the physics loop
+    groupHigh.name = "slimeCore";
 
-    // Advanced Jelly Material (Subsurface scattering look)
     const slimeMat = new THREE.MeshPhysicalMaterial({
-      color: 0x06b6d4,       // Cyan base
+      color: 0x06b6d4,       
       metalness: 0.1,
       roughness: 0.2,
-      transmission: 0.6,     // Glass-like translucency
-      thickness: 0.5,        // Light refraction depth
-      clearcoat: 1.0,        // Wet, shiny exterior
+      transmission: 0.6,     
+      thickness: 0.5,        
+      clearcoat: 1.0,        
       clearcoatRoughness: 0.1
     });
 
-    // 1. Base Slime Body (Pivot moved to bottom for proper squashing)
     const bodyGeo = new THREE.SphereGeometry(0.4, 32, 32);
     bodyGeo.translate(0, 0.4, 0); 
     const body = new THREE.Mesh(bodyGeo, slimeMat);
 
-    // 2. Animal Ears (Cat shape)
     const earGeo = new THREE.ConeGeometry(0.12, 0.25, 16);
-    earGeo.translate(0, 0.125, 0); // Pivot at the base of the ear
+    earGeo.translate(0, 0.125, 0);
 
     const leftEar = new THREE.Mesh(earGeo, slimeMat);
     leftEar.position.set(0.2, 0.7, 0);
@@ -42,9 +44,8 @@ export class Player {
     rightEar.position.set(-0.2, 0.7, 0);
     rightEar.rotation.set(-0.1, 0, 0.3);
 
-    // 3. Cute Dot Eyes
     const eyeGeo = new THREE.SphereGeometry(0.05, 16, 16);
-    const eyeMat = new THREE.MeshBasicMaterial({ color: 0x0f172a }); // Dark navy
+    const eyeMat = new THREE.MeshBasicMaterial({ color: 0x0f172a }); 
     
     const leftEye = new THREE.Mesh(eyeGeo, eyeMat);
     leftEye.position.set(0.15, 0.45, 0.35);
@@ -52,10 +53,9 @@ export class Player {
     const rightEye = new THREE.Mesh(eyeGeo, eyeMat);
     rightEye.position.set(-0.15, 0.45, 0.35);
 
-    // 4. Pink Blush Cheeks
     const blushGeo = new THREE.SphereGeometry(0.06, 16, 16);
-    blushGeo.scale(1, 0.5, 0.2); // Flatten into ovals
-    const blushMat = new THREE.MeshBasicMaterial({ color: 0xf43f5e }); // Rose pink
+    blushGeo.scale(1, 0.5, 0.2); 
+    const blushMat = new THREE.MeshBasicMaterial({ color: 0xf43f5e }); 
     
     const leftBlush = new THREE.Mesh(blushGeo, blushMat);
     leftBlush.position.set(0.25, 0.35, 0.35);
@@ -63,11 +63,10 @@ export class Player {
     const rightBlush = new THREE.Mesh(blushGeo, blushMat);
     rightBlush.position.set(-0.25, 0.35, 0.35);
 
-    // Assemble the slime
     body.add(leftEar, rightEar, leftEye, rightEye, leftBlush, rightBlush);
     groupHigh.add(body);
 
-    // --- LOW DETAIL CHARACTER (For Distant Optimization) ---
+    // --- LOW DETAIL CHARACTER ---
     const geoLow = new THREE.BoxGeometry(0.6, 0.6, 0.6);
     const matLow = new THREE.MeshBasicMaterial({ color: 0x06b6d4 });
     const meshLow = new THREE.Mesh(geoLow, matLow);
@@ -101,7 +100,7 @@ export class Player {
 
   updateSpatialUI(camera) {
     const headPos = this.mesh.position.clone();
-    headPos.y += 1.2; // Adjusted for shorter slime height
+    headPos.y += 1.2; 
     headPos.project(camera);
 
     const x = (headPos.x * 0.5 + 0.5) * window.innerWidth;
