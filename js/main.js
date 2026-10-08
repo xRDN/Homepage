@@ -190,13 +190,30 @@ function animate() {
     player.mesh.update(camera);
     player.updateSpatialUI(camera);
 
-    // Safely target and animate the named floating paws
-    const leftPaw = player.mesh.levels[0].object.getObjectByName("lHand");
-    const rightPaw = player.mesh.levels[0].object.getObjectByName("rHand");
+    // Jumping and squashing animation for the slime
+    const slimeCore = player.mesh.levels[0].object.getObjectByName("slimeCore");
     
-    if (leftPaw && rightPaw) {
-      leftPaw.position.y = 0.4 + Math.sin(time) * 0.05;
-      rightPaw.position.y = 0.4 + Math.sin(time + Math.PI) * 0.05;
+    if (slimeCore) {
+      // 1. Calculate absolute sine wave for continuous hopping
+      const jumpTrajectory = Math.abs(Math.sin(time * 1.5));
+      slimeCore.position.y = jumpTrajectory * 0.7; // Jump height
+
+      // 2. Base aerodynamic stretch (taller at peak jump)
+      const stretch = 1 + jumpTrajectory * 0.2; 
+      const squash = 1 - jumpTrajectory * 0.1;
+      
+      // 3. Ground impact squish (triggers only when near the floor)
+      let impact = 0;
+      if (jumpTrajectory < 0.2) {
+        impact = (0.2 - jumpTrajectory) * 2.0;
+      }
+
+      // Apply dimensional scaling
+      slimeCore.scale.set(
+        squash + impact,       // X swells on impact
+        stretch - impact,      // Y compresses on impact
+        squash + impact        // Z swells on impact
+      );
     }
 
     if (!player.isLocal) {
