@@ -1,4 +1,8 @@
 import * as THREE from 'three';
+import { sound } from './sound.js';
+import { liveWeather } from './weather.js';
+import { createNet } from './net.js';
+import { initAI } from './ai.js';
 
 // ---- edit me ----
 const LINKS = [
@@ -37,11 +41,20 @@ const cur = { hi: P[key()].hi, si: P[key()].si };
 CK.forEach(k => cur[k] = new THREE.Color(P[key()][k]));
 let phase = .45 + (night ? Math.PI : 0), phaseT = phase, nightMix = night ? 1 : 0;
 const syncMood = () => { $('#b-tod').textContent = night ? '🌙 Night' : '☀️ Day'; $('#b-temp').textContent = cold ? '❄️ Cold' : '🔥 Warm'; };
-const toggleTod = () => { night = !night; phaseT += Math.PI; syncMood(); };
-const toggleTemp = () => { cold = !cold; syncMood(); };
+let live = false, wx = 'clear', temp = null;
+const syncLive = () => { $('#b-live').textContent = live ? `📍 Live ${temp}°` : '📍 Live'; };
+const unlive = () => { live = false; wx = 'clear'; localStorage.removeItem('island.live'); syncLive(); };
+const toggleTod = () => { unlive(); night = !night; phaseT += Math.PI; syncMood(); };
+const toggleTemp = () => { unlive(); cold = !cold; syncMood(); };
+const applyLive = r => { if (r.night !== night) { night = r.night; phaseT += Math.PI; } cold = r.cold; wx = r.wx; temp = r.temp; live = true; syncMood(); syncLive(); };
+const goLive = () => liveWeather().then(r => { applyLive(r); localStorage.setItem('island.live', '1'); }).catch(() => { $('#b-live').textContent = '📍 Blocked'; });
+$('#b-live').onclick = e => { live ? unlive() : goLive(); e.currentTarget.blur(); };
+$('#b-snd').onclick = e => { e.currentTarget.textContent = sound.toggle() ? '🔊' : '🔇'; e.currentTarget.blur(); };
+setInterval(() => { if (live) liveWeather().then(applyLive).catch(() => {}); }, 15 * 60 * 1000);
 $('#b-tod').onclick = e => { toggleTod(); e.currentTarget.blur(); };
 $('#b-temp').onclick = e => { toggleTemp(); e.currentTarget.blur(); };
 syncMood();
+if (localStorage.getItem('island.live') === '1') goLive();
 
 const canvas = $('#webgl');
 const scene = new THREE.Scene();
@@ -166,13 +179,16 @@ const stations = SPOTS.map(l => {
 let panelOpen = false;
 const panel = $('#projects');
 $('#plist').innerHTML = PROJECTS.map(p => `<a class="proj" href="${p.url}" target="_blank" rel="noopener"><b>${p.emoji}</b><div><h3>${p.name}</h3><p>${p.desc}</p>${p.tags.map(t => `<i>${t}</i>`).join('')}</div><em>↗</em></a>`).join('');
-function openPanel() { panelOpen = true; panel.classList.remove('hidden'); $('#px').focus(); }
-function closePanel() { panelOpen = false; panel.classList.add('hidden'); }
-$('#px').onclick = closePanel;
-panel.addEventListener('pointerdown', e => { if (e.target === panel) closePanel(); });
-const open = s => s.panel ? openPanel() : window.open(s.url, '_blank', 'noopener');
-$('#links').innerHTML = LINKS.map(l => `<a href="${l.url}" target="_blank" rel="noopener">${l.emoji} ${l.label}</a>`).join('') + '<button id="nav-proj">🗂️ Projects</button>';
-$('#nav-proj').onclick = openPanel;
+let activePanel;
+function openPanel(el = panel) { activePanel = el; panelOpen = true; el.classList.remove('hidden'); el.querySelector('.x').focus(); }
+function closePanel() { panelOpen = false; activePanel && activePanel.classList.add('hidden'); }
+const aiPanel = $('#ai');
+[panel, aiPanel].forEach(p => { p.querySelector('.x').onclick = closePanel; p.addEventListener('pointerdown', e => { if (e.target === p) closePanel(); }); });
+const ai = initAI({ system: `You are Pip, a friendly little bunbot living on Erdian's island homepage. Answer briefly (max 3 sentences) and warmly, using only these facts about Erdian's projects: ${PROJECTS.map(p => `${p.name}: ${p.desc} (${p.tags.join(', ')})`).join('; ')}. If you do not know, say so.` });
+const open = s => { sound.chime(); return s.panel ? openPanel() : window.open(s.url, '_blank', 'noopener'); };
+$('#links').innerHTML = LINKS.map(l => `<a href="${l.url}" target="_blank" rel="noopener">${l.emoji} ${l.label}</a>`).join('') + '<button id="nav-proj">🗂️ Projects</button><button id="nav-ai">🧠 Ask Pip</button>';
+$('#nav-proj').onclick = () => openPanel();
+$('#nav-ai').onclick = () => { openPanel(aiPanel); ai.prep(); };
 
 // ---- characters ----
 const KINDS = {
@@ -268,10 +284,22 @@ function place(o) {
   for (const e of [o.n, o.b]) { e.style.display = tmp.z > 1 ? 'none' : 'block'; e.style.transform = `translate(${x}px,${y}px) translate(-50%,-100%)`; }
 }
 
+const dropPlayer = o => { scene.remove(o.mesh); o.n.remove(); o.b.remove(); };
+const net = createNet({
+  make: (t, n) => makePlayer(KINDS[t] ? t : 'slime', n), retype: (o, t) => KINDS[t] && setType(o, t),
+  say, drop: dropPlayer, count: n => { $('#b-net').textContent = `🌐 ${n + 1} here`; },
+});
+$('#b-net').onclick = async e => {
+  const b = e.currentTarget; b.blur();
+  if (net.on()) { net.leave(); b.textContent = '🌐 Go online'; return; }
+  b.textContent = '🌐 …';
+  try { await net.join(); } catch { b.textContent = '🌐 Unavailable'; }
+};
+
 // ---- flow ----
 let state = 'intro', sel = 'slime', me, npcs = [], nextHop = 0, nearby = null;
 $('#go').onclick = () => {
-  state = 'pick'; $('#intro').classList.add('hidden'); $('#pick').classList.remove('hidden');
+  sound.start(); state = 'pick'; $('#intro').classList.add('hidden'); $('#pick').classList.remove('hidden');
   me = makePlayer(sel, 'You');
 };
 document.querySelectorAll('.pick').forEach(b => b.onclick = () => {
@@ -291,10 +319,10 @@ $('#start').onclick = () => {
 // ---- input ----
 const keys = new Set();
 let joy = { x: 0, y: 0 }, yaw = 0, pitch = .3, dist = 9;
-const jump = () => { if (me && me.y === 0 && !panelOpen) me.vy = 11; };
+const jump = () => { if (me && me.y === 0 && !panelOpen) { me.vy = 11; sound.jump(); } };
 addEventListener('keydown', e => {
   if (e.key === 'Escape' && panelOpen) return closePanel();
-  if (e.target.tagName === 'INPUT' || panelOpen) return;
+  if (/INPUT|SELECT/.test(e.target.tagName) || panelOpen) return;
   const k = e.key.toLowerCase();
   if (k === 'n') toggleTod();
   if (k === 't') toggleTemp();
@@ -309,7 +337,7 @@ $('#msg').addEventListener('keydown', e => { if (e.key === 'Escape') e.target.bl
 $('#chat').addEventListener('submit', e => {
   e.preventDefault();
   const v = $('#msg').value.trim();
-  if (v) say(me, v);
+  if (v) { say(me, v); net.say(v); }
   $('#msg').value = '';
   if (coarse) $('#msg').blur();
 });
@@ -366,6 +394,7 @@ addEventListener('resize', () => {
 });
 
 // ---- loop ----
+let lastSk = '', stepT = 0;
 const clock = new THREE.Clock(), look = new V(0, 1, 0), pv = new V(), c1 = new THREE.Color();
 const vis = y => clamp((y + 4) / 14, 0, 1);
 renderer.setAnimationLoop(() => {
@@ -378,8 +407,8 @@ renderer.setAnimationLoop(() => {
   nightMix += ((night ? 1 : 0) - nightMix) * a;
   phase += (phaseT - phase) * (1 - Math.exp(-dt * 1.6));
   scene.fog.color.copy(cur.sky);
-  hemi.color.copy(cur.hs); hemi.groundColor.copy(cur.hg); hemi.intensity = cur.hi;
-  sun.color.copy(cur.sun); sun.intensity = cur.si;
+  hemi.color.copy(cur.hs); hemi.groundColor.copy(cur.hg); hemi.intensity = cur.hi * (wx === 'rain' ? .75 : 1);
+  sun.color.copy(cur.sun); sun.intensity = cur.si * (wx === 'rain' ? .6 : 1);
   grassM.color.copy(cur.grass); dirtM.color.copy(cur.dirt); waterM.color.copy(cur.water); cloudM.color.copy(cur.cloud);
   leafM.forEach((m, i) => m.color.copy(cur.leaf).offsetHSL(0, 0, (i - 1) * .05));
   sunS.position.set(Math.cos(phase) * 40, Math.sin(phase) * 70, -70);
@@ -389,17 +418,22 @@ renderer.setAnimationLoop(() => {
   starM.opacity = nightMix * .9;
   sun.position.copy(sunS.position).lerp(moonS.position, nightMix).normalize();
   sun.position.y = Math.max(sun.position.y, .35); sun.position.normalize().multiplyScalar(24);
-  pMat.color.lerp(c1.set(cold ? 0xffffff : 0xffe27a), a);
-  pMat.size += ((cold ? .16 : .22) - pMat.size) * a;
-  pMat.opacity += ((cold ? .9 : night ? 1 : 0) - pMat.opacity) * a;
+  const rain = wx === 'rain', snow = !rain && (cold || wx === 'snow');
+  pMat.color.lerp(c1.set(rain ? 0x9fc8ff : snow ? 0xffffff : 0xffe27a), a);
+  pMat.size += ((rain ? .08 : snow ? .16 : .22) - pMat.size) * a;
+  pMat.opacity += ((rain ? .7 : snow ? .9 : night ? 1 : 0) - pMat.opacity) * a;
+  scene.fog.near += ((wx === 'fog' ? 6 : 35) - scene.fog.near) * a; scene.fog.far += ((wx === 'fog' ? 34 : 90) - scene.fog.far) * a;
   for (let i = 0; i < N; i++) {
     const j = i * 3;
-    if (cold) { pa[j + 1] -= 1.5 * dt; pa[j] += Math.sin(t + seed[i]) * .4 * dt; if (pa[j + 1] < 0) pa[j + 1] = 14; }
+    if (rain) { pa[j + 1] -= 16 * dt; pa[j] += 1.5 * dt; if (pa[j + 1] < 0) pa[j + 1] = 14; }
+    else if (snow) { pa[j + 1] -= 1.5 * dt; pa[j] += Math.sin(t + seed[i]) * .4 * dt; if (pa[j + 1] < 0) pa[j + 1] = 14; }
     else { pa[j + 1] = clamp(pa[j + 1] + Math.sin(t * .7 + seed[i]) * .25 * dt, .4, 5); pa[j] += Math.cos(t * .5 + seed[i]) * .3 * dt; }
   }
   pGeo.attributes.position.needsUpdate = true;
 
   clouds.rotation.y += dt * .02;
+  const sk = key() + wx; if (sk !== lastSk) { lastSk = sk; sound.set(night, cold, wx); }
+  if (state === 'play' && me.moving && me.y === 0 && (stepT -= dt) <= 0) { sound.step(cold || wx === 'snow'); stepT = .32; }
   stations.forEach((s, i) => {
     s.sign.position.y = 2.4 + Math.sin(t * 2 + i) * .12;
     s.sign.lookAt(camera.position);
@@ -445,6 +479,7 @@ renderer.setAnimationLoop(() => {
   look.lerp(pv.set(...tl), k);
   camera.lookAt(look);
 
-  for (const o of [me, ...npcs.map(n => n.o)]) if (o) { animate(o, dt, t); if (state !== 'intro') place(o); }
+  net.tick(dt, me, state === 'play');
+  for (const o of [me, ...npcs.map(n => n.o), ...net.list()]) if (o) { animate(o, dt, t); if (state !== 'intro') place(o); }
   renderer.render(scene, camera);
 });
