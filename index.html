@@ -15,6 +15,9 @@
 <div id="mood">
   <button id="b-tod" title="Toggle day / night (N)"></button>
   <button id="b-temp" title="Toggle warm / cold (T)"></button>
+  <button id="b-live" title="Match your real local weather">📍 Live</button>
+  <button id="b-net" title="Peer-to-peer: other visitors can see your IP address">🌐 Go online</button>
+  <button id="b-snd" title="Sound on / off">🔊</button>
 </div>
 
 <section id="intro" class="screen">
@@ -55,6 +58,19 @@
     <button id="px" class="x" aria-label="Close">✕</button>
     <h2 id="ptitle">Projects</h2>
     <div id="plist"></div>
+  </div>
+</aside>
+
+<aside id="ai" class="panel hidden" role="dialog" aria-modal="true" aria-labelledby="atitle">
+  <div class="sheet">
+    <button class="x" aria-label="Close">✕</button>
+    <h2 id="atitle">Ask Pip 🧠</h2>
+    <select id="ai-model" aria-label="Model"></select>
+    <button id="ai-load" class="btn" disabled>Load model</button>
+    <progress id="ai-bar" max="100" value="0"></progress>
+    <p id="ai-note">Optional. Nothing is downloaded until you press Load model.</p>
+    <div id="ai-log"></div>
+    <form id="ai-chat" class="hidden" autocomplete="off"><input id="ai-q" type="text" maxlength="200" placeholder="Ask about Erdian's projects…" aria-label="Question"><button class="btn">Ask</button></form>
   </div>
 </aside>
 
