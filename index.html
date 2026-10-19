@@ -1,51 +1,49 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ERDIAN | Multiplayer Engine</title>
-  <link rel="stylesheet" href="./css/style.css">
-
-  <script type="importmap">
-    {
-      "imports": {
-        "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js"
-      }
-    }
-  </script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Erdian · little island</title>
+<meta name="description" content="A tiny walkable island with my links.">
+<link rel="stylesheet" href="./css/style.css">
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js"}}</script>
 </head>
 <body>
+<canvas id="webgl" aria-label="A small 3D island you can walk around"></canvas>
+<div id="labels"></div>
 
-  <!-- Landing & Character Select Screen -->
-  <!-- 1. Landing Screen -->
-  <div id="intro-screen">
-    <h1 class="intro-title">ERDIAN</h1>
-    <div class="intro-cta" id="btn-start">PRESS TO CONTINUE</div>
+<section id="intro" class="screen">
+  <div class="card">
+    <p class="eyebrow">welcome to</p>
+    <h1>Erdian's<br>little island</h1>
+    <p class="sub">A tiny place with my links, a friend or two, and room to wander.</p>
+    <button id="go" class="btn">Come on in</button>
   </div>
+</section>
 
-  <!-- 2. Character Select Screen -->
-  <div id="char-select-screen" class="hidden">
-    <h2 class="select-header">SELECT AVATAR</h2>
-    <div class="char-options">
-      <button class="char-btn active" data-type="slime">CYBER SLIME</button>
-      <button class="char-btn" data-type="mecha">MECHA BOT</button>
+<section id="pick" class="screen hidden">
+  <div class="card low">
+    <h2>Pick a buddy</h2>
+    <div class="picks">
+      <button class="pick on" data-t="slime"><b>🫧</b>Blobby</button>
+      <button class="pick" data-t="bot"><b>🐰</b>Bunbot</button>
     </div>
-    <div class="intro-cta" id="btn-deploy" style="margin-top: 3rem;">CONFIRM & DEPLOY</div>
+    <button id="start" class="btn">Let's go</button>
   </div>
+</section>
 
-  <canvas id="webgl"></canvas>
-  <div id="ui-layer"></div>
+<div id="hud" class="hidden">
+  <nav id="links" aria-label="My links"></nav>
+  <button id="prompt" class="btn hidden"></button>
+  <form id="chat" autocomplete="off">
+    <input id="msg" type="text" maxlength="80" placeholder="Say something… (Enter)" aria-label="Chat message">
+    <button class="btn" type="submit">Send</button>
+  </form>
+  <p id="hint">WASD / arrows move · Space jumps · drag to look · E opens a sign</p>
+  <div id="joy"><i></i></div>
+  <button id="jump" class="btn" aria-label="Jump">⤒</button>
+</div>
 
-  <!-- Touch Zones for Mobile -->
-  <div id="camera-zone"></div>
-
-  <!-- Operational HUD (Animated in via CSS) -->
-  <div id="chat-interface">
-    <input type="text" id="chat-input" placeholder="Press Enter to chat..." autocomplete="off">
-    <button id="chat-send">Send</button>
-  </div>
-
-  <!-- Entry Script -->
-  <script type="module" src="./js/main.js?v=10"></script>
+<script type="module" src="./js/main.js"></script>
 </body>
 </html>
