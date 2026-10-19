@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Erdian · little island</title>
-<meta name="description" content="A tiny walkable island with my links.">
+<meta name="description" content="A tiny walkable island with my links and projects.">
 <link rel="stylesheet" href="./css/style.css">
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js"}}</script>
 </head>
@@ -12,11 +12,16 @@
 <canvas id="webgl" aria-label="A small 3D island you can walk around"></canvas>
 <div id="labels"></div>
 
+<div id="mood">
+  <button id="b-tod" title="Toggle day / night (N)"></button>
+  <button id="b-temp" title="Toggle warm / cold (T)"></button>
+</div>
+
 <section id="intro" class="screen">
   <div class="card">
     <p class="eyebrow">welcome to</p>
     <h1>Erdian's<br>little island</h1>
-    <p class="sub">A tiny place with my links, a friend or two, and room to wander.</p>
+    <p class="sub">My links, my projects, a few friends, and room to wander.</p>
     <button id="go" class="btn">Come on in</button>
   </div>
 </section>
@@ -26,7 +31,8 @@
     <h2>Pick a buddy</h2>
     <div class="picks">
       <button class="pick on" data-t="slime"><b>🫧</b>Blobby</button>
-      <button class="pick" data-t="bot"><b>🐰</b>Bunbot</button>
+      <button class="pick" data-t="mochi"><b>🍡</b>Mochi</button>
+      <button class="pick" data-t="bot"><b>🤖</b>Bunbot</button>
     </div>
     <button id="start" class="btn">Let's go</button>
   </div>
@@ -39,10 +45,18 @@
     <input id="msg" type="text" maxlength="80" placeholder="Say something… (Enter)" aria-label="Chat message">
     <button class="btn" type="submit">Send</button>
   </form>
-  <p id="hint">WASD / arrows move · Space jumps · drag to look · E opens a sign</p>
+  <p id="hint">WASD / arrows move · Space jumps · drag to look · E opens a sign · N / T change the weather</p>
   <div id="joy"><i></i></div>
   <button id="jump" class="btn" aria-label="Jump">⤒</button>
 </div>
+
+<aside id="projects" class="panel hidden" role="dialog" aria-modal="true" aria-labelledby="ptitle">
+  <div class="sheet">
+    <button id="px" class="x" aria-label="Close">✕</button>
+    <h2 id="ptitle">Projects</h2>
+    <div id="plist"></div>
+  </div>
+</aside>
 
 <script type="module" src="./js/main.js"></script>
 </body>
