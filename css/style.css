@@ -67,3 +67,16 @@ button:focus-visible,input:focus-visible,a:focus-visible{outline:3px solid var(-
   #mood button{font-size:.75rem;padding:.45rem .75rem}
 }
 @media (pointer:coarse){#chat{top:calc(max(1rem,env(safe-area-inset-top)) + 6.4rem)}}
+
+#mood{flex-wrap:wrap;justify-content:flex-end;max-width:calc(100vw - 2rem)}
+#ai .sheet{display:grid;gap:.7rem}
+#ai select{font:inherit;color:var(--ink);padding:.6rem .9rem;border-radius:99px;border:3px solid #fff;background:#fff}
+#ai-bar{width:100%;height:.7rem;accent-color:var(--leaf)}
+#ai-note{font-size:.8rem;opacity:.75;line-height:1.4}
+#ai-log{max-height:34vh;overflow:auto;display:grid;gap:.4rem}
+.m{padding:.5rem .8rem;border-radius:16px;font-size:.9rem;line-height:1.4;max-width:90%;user-select:text;-webkit-user-select:text}
+.m.me{background:#e6f2dc;justify-self:end}.m.pip{background:#fff}
+#ai-chat{display:flex;gap:.5rem}#ai-chat.hidden{display:none}
+#ai-q{flex:1;min-width:0;font:inherit;color:var(--ink);background:#fff;border:3px solid #fff;border-radius:99px;padding:.6rem 1rem;box-shadow:0 3px 0 rgba(60,110,90,.25)}
+@media (max-width:640px){#links{top:calc(max(1rem,env(safe-area-inset-top)) + 5.4rem)}}
+@media (pointer:coarse){#chat{top:calc(max(1rem,env(safe-area-inset-top)) + 8.6rem)}}
