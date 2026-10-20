@@ -1,6 +1,6 @@
 # ABOUT ME PAGE
 
-To test the extend of static web.
+And certain little feature to test the extend of static web.
 
 ### Features
 
@@ -8,9 +8,10 @@ To test the extend of static web.
 - Object showcase and picker
 - Animation
 - Joystick and movement
-- Chat
+- Chat and AI
 
 
 ### Stack
 
-- THREE.JS
+- Three.JS
+- Theatre.JS
