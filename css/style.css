@@ -106,3 +106,7 @@ button:focus-visible,input:focus-visible,a:focus-visible{outline:3px solid var(-
 #fallback[hidden]{display:none}
 #fb-list{display:grid;gap:.6rem;max-width:30rem;margin:1.5rem auto}
 #fb-list a{background:#fff;border-radius:18px;padding:.8rem 1rem;text-decoration:none;color:var(--ink);font-weight:700;box-shadow:0 3px 0 rgba(60,110,90,.25)}
+
+.row{display:flex;gap:.6rem;margin-top:1rem;flex-wrap:wrap}
+.btn.alt{background:#fff;color:var(--ink);box-shadow:0 5px 0 rgba(60,110,90,.3)}
+#story-msg{margin-top:.6rem;font-size:.85rem;font-weight:700}

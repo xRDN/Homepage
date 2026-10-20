@@ -256,7 +256,7 @@ function openProject(i) {
   cards[i] && cards[i].scrollIntoView({ block: 'nearest' });
 }
 const aiPanel = $('#ai');
-[panel, aiPanel, $('#dex')].forEach(p => { p.querySelector('.x').onclick = closePanel; p.addEventListener('pointerdown', e => { if (e.target === p) closePanel(); }); });
+[panel, aiPanel, $('#dex'), $('#story-confirm')].forEach(p => { p.querySelector('.x').onclick = closePanel; p.addEventListener('pointerdown', e => { if (e.target === p) closePanel(); }); });
 const KNOW = [
   { k: ['hi', 'hello', 'hey', 'yo'], a: "Hi! I'm Pip 🐰 Ask me about Erdian's projects or where to find him online." },
   { k: ['who', 'erdian', 'yourself', 'bio'], a: 'Erdian builds things for the web. The Projects board has the details, and the links up top lead to his profiles.' }, // edit me
@@ -267,9 +267,15 @@ const KNOW = [
 ];
 const ai = initAI({ know: KNOW, chips: ['What projects are there?', ...PROJECTS.map(p => p.name), 'How can I reach Erdian?'], system: `You are Pip, a friendly little bunbot living on Erdian's island homepage. Answer briefly (max 3 sentences) and warmly, using only these facts about Erdian's projects: ${PROJECTS.map(p => `${p.name}: ${p.desc} (${p.tags.join(', ')})`).join('; ')}. If you do not know, say so.` });
 const open = s => { sound.chime(); return s.panel ? openProject(s.proj) : window.open(s.url, '_blank', 'noopener'); };
-$('#links').innerHTML = LINKS.map(l => `<a href="${l.url}" target="_blank" rel="noopener">${l.emoji} ${l.label}</a>`).join('') + '<button id="nav-proj">🗂️ Projects</button><button id="nav-ai">🧠 Ask Pip</button><button id="nav-fish">🐟 Fish</button>';
+$('#links').innerHTML = LINKS.map(l => `<a href="${l.url}" target="_blank" rel="noopener">${l.emoji} ${l.label}</a>`).join('') + '<button id="nav-proj">🗂️ Projects</button><button id="nav-ai">🧠 Ask Pip</button><button id="nav-fish">🐟 Fish</button><button id="nav-story">📖 Story</button>';
 $('#nav-proj').onclick = () => openPanel();
 $('#nav-ai').onclick = () => openPanel(aiPanel);
+$('#nav-story').onclick = () => { $('#story-msg').textContent = ''; openPanel($('#story-confirm')); };
+$('#story-no').onclick = closePanel;
+$('#story-go').onclick = async () => {
+  try { const r = await fetch('./story/index.html', { method: 'HEAD' }); if (!r.ok) throw 0; location.href = './story/'; }
+  catch { $('#story-msg').textContent = 'Story mode isn’t built on this site yet. See the README for the one-time build.'; }
+};
 $('#nav-fish').onclick = () => { renderDex($('#dex-grid'), fishing.dex); openPanel($('#dex')); };
 
 // ---- characters ----
