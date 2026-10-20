@@ -12,13 +12,18 @@
 <canvas id="webgl" aria-label="A small 3D island you can walk around"></canvas>
 <div id="labels"></div>
 
-<div id="mood">
+<div id="mood"><button id="b-gear" aria-label="Settings">⚙️</button></div>
+<div id="drawer" class="hidden">
   <button id="b-tod" title="Toggle day / night (N)"></button>
   <button id="b-temp" title="Toggle warm / cold (T)"></button>
   <button id="b-live" title="Match your real local weather">📍 Live</button>
   <button id="b-net" title="Peer-to-peer: other visitors can see your IP address">🌐 Go online</button>
   <button id="b-snd" title="Sound on / off">🔊</button>
+  <button id="b-photo">📸 Postcard</button>
+  <button id="b-lite" title="Lighter graphics for slow devices"></button>
 </div>
+<div id="toasts" aria-live="polite"></div>
+<main id="fallback" hidden><h1>Erdian's little island</h1><p>Your browser can't run the 3D island, so here's the short version.</p><div id="fb-list"></div></main>
 
 <section id="intro" class="screen">
   <div class="card">
@@ -48,7 +53,8 @@
     <input id="msg" type="text" maxlength="80" placeholder="Say something… (Enter)" aria-label="Chat message">
     <button class="btn" type="submit">Send</button>
   </form>
-  <p id="hint">WASD / arrows move · Space jumps · drag to look · E opens a sign · N / T change the weather</p>
+  <p id="hint">WASD / arrows or tap the ground to move · Space jumps · drag to look · E opens a sign · N / T change the weather</p>
+  <div id="emotes"><button data-e="👋" aria-label="Wave">👋</button><button data-e="💃" aria-label="Dance">💃</button><button data-e="❤️" aria-label="Heart">❤️</button></div>
   <div id="joy"><i></i></div>
   <button id="jump" class="btn" aria-label="Jump">⤒</button>
 </div>
@@ -61,16 +67,24 @@
   </div>
 </aside>
 
+<aside id="dex" class="panel hidden" role="dialog" aria-modal="true" aria-label="Fish collection">
+  <div class="sheet"><button class="x" aria-label="Close">✕</button><h2>🐟 Fish collection</h2><div id="dex-grid"></div></div>
+</aside>
+
 <aside id="ai" class="panel hidden" role="dialog" aria-modal="true" aria-labelledby="atitle">
   <div class="sheet">
     <button class="x" aria-label="Close">✕</button>
-    <h2 id="atitle">Ask Pip 🧠</h2>
-    <select id="ai-model" aria-label="Model"></select>
-    <button id="ai-load" class="btn" disabled>Load model</button>
-    <progress id="ai-bar" max="100" value="0"></progress>
-    <p id="ai-note">Optional. Nothing is downloaded until you press Load model.</p>
+    <h2 id="atitle">Ask Pip 🐰</h2>
+    <div class="seg"><button id="ai-t-quick" class="on">⚡ Quick · 0 MB</button><button id="ai-t-smart">🧠 Smart · download</button></div>
+    <div id="ai-smart" class="hidden">
+      <select id="ai-model" aria-label="Model"></select>
+      <button id="ai-load" class="btn" disabled>Load model</button>
+      <progress id="ai-bar" max="100" value="0"></progress>
+      <p id="ai-note">Optional. Nothing is downloaded until you press Load model.</p>
+    </div>
+    <div id="ai-chips"></div>
     <div id="ai-log"></div>
-    <form id="ai-chat" class="hidden" autocomplete="off"><input id="ai-q" type="text" maxlength="200" placeholder="Ask about Erdian's projects…" aria-label="Question"><button class="btn">Ask</button></form>
+    <form id="ai-chat" autocomplete="off"><input id="ai-q" type="text" maxlength="200" placeholder="Ask about Erdian's projects…" aria-label="Question"><button class="btn">Ask</button></form>
   </div>
 </aside>
 
