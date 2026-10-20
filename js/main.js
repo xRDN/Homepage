@@ -3,6 +3,7 @@ import { sound } from './sound.js';
 import { liveWeather } from './weather.js';
 import { createNet } from './net.js';
 import { initAI } from './ai.js';
+import { createFishing, renderDex } from './fish.js';
 
 // ---- edit me ----
 const LINKS = [
@@ -26,6 +27,16 @@ const coarse = matchMedia('(pointer: coarse)').matches;
 const rand = (a, b) => a + Math.random() * (b - a);
 const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
 const wrap = a => Math.atan2(Math.sin(a), Math.cos(a));
+const EMO = ['👋', '💃', '❤️'];
+const toast = (msg, c = '#5aa469') => { const d = document.createElement('div'); d.className = 'toast'; d.textContent = msg; d.style.borderColor = c; $('#toasts').append(d); setTimeout(() => d.remove(), 3200); };
+const prefs = JSON.parse(localStorage.getItem('island.prefs') || '{}'), savePrefs = () => localStorage.setItem('island.prefs', JSON.stringify(prefs));
+const lite = prefs.lite ?? (coarse && (navigator.hardwareConcurrency || 8) <= 4);
+{ const t = document.createElement('canvas');
+  if (!(t.getContext('webgl2') || t.getContext('webgl'))) { // plain 2D fallback
+    $('#fallback').hidden = false;
+    $('#fb-list').innerHTML = LINKS.map(l => `<a href="${l.url}">${l.emoji} ${l.label}</a>`).join('') + PROJECTS.map(p => `<a href="${p.url}">${p.emoji} ${p.name}: ${p.desc}</a>`).join('');
+    throw new Error('WebGL unavailable');
+  } }
 
 // ---- world moods: [day|night][warm|cold] ----
 const P = {
@@ -36,6 +47,7 @@ const P = {
 };
 const CK = ['sky', 'hs', 'hg', 'sun', 'grass', 'dirt', 'water', 'leaf', 'cloud'];
 let night = (h => h < 6 || h >= 19)(new Date().getHours()), cold = false;
+if (/night/.test(location.hash)) night = true; if (/day/.test(location.hash)) night = false; if (/cold/.test(location.hash)) cold = true;
 const key = () => (night ? 'n' : 'd') + (cold ? 'c' : 'w');
 const cur = { hi: P[key()].hi, si: P[key()].si };
 CK.forEach(k => cur[k] = new THREE.Color(P[key()][k]));
@@ -49,7 +61,8 @@ const toggleTemp = () => { unlive(); cold = !cold; syncMood(); };
 const applyLive = r => { if (r.night !== night) { night = r.night; phaseT += Math.PI; } cold = r.cold; wx = r.wx; temp = r.temp; live = true; syncMood(); syncLive(); };
 const goLive = () => liveWeather().then(r => { applyLive(r); localStorage.setItem('island.live', '1'); }).catch(() => { $('#b-live').textContent = '📍 Blocked'; });
 $('#b-live').onclick = e => { live ? unlive() : goLive(); e.currentTarget.blur(); };
-$('#b-snd').onclick = e => { e.currentTarget.textContent = sound.toggle() ? '🔊' : '🔇'; e.currentTarget.blur(); };
+$('#b-snd').onclick = e => { const on = sound.toggle(); e.currentTarget.textContent = on ? '🔊' : '🔇'; prefs.mute = !on; savePrefs(); e.currentTarget.blur(); };
+if (prefs.mute) { sound.toggle(); $('#b-snd').textContent = '🔇'; }
 setInterval(() => { if (live) liveWeather().then(applyLive).catch(() => {}); }, 15 * 60 * 1000);
 $('#b-tod').onclick = e => { toggleTod(); e.currentTarget.blur(); };
 $('#b-temp').onclick = e => { toggleTemp(); e.currentTarget.blur(); };
@@ -63,9 +76,9 @@ scene.fog = new THREE.Fog(cur.sky.clone(), 35, 90);
 const camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, .1, 200);
 camera.position.set(0, 9, 30);
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setPixelRatio(Math.min(devicePixelRatio, lite ? 1 : 2));
 renderer.setSize(innerWidth, innerHeight);
-renderer.shadowMap.enabled = true;
+renderer.shadowMap.enabled = !lite;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
 const hemi = new THREE.HemisphereLight(0xffffff, 0xffffff, 1.5);
@@ -129,6 +142,7 @@ const leafM = [M(0xffffff), M(0xffffff), M(0xffffff)];
 mk(cyl(14, 14, 1, 64), grassM, [0, -.5, 0]);
 mk(cyl(14.2, 8, 4, 64), dirtM, [0, -3, 0]);
 mk(cyl(2.6, 2.6, .05, 48), waterM, [-7, .03, 5]);
+waterM.transparent = true; waterM.opacity = .85;
 
 function tree(x, z, s, m) {
   mk(cyl(.15 * s, .22 * s, 1.2 * s, 10), M(0x8a6444), [x, .6 * s, z]);
@@ -142,7 +156,7 @@ tree(9, 6, 1.2, 0); tree(2, 10, .9, 1); tree(-3, 11, 1, 2);
 const petals = [0xffffff, 0xffd36e, 0xc7a8ff, 0xff7a6b];
 for (let i = 0; i < 40; i++) {
   const a = rand(0, 6.28), r = rand(4, 12.5), x = Math.cos(a) * r, z = Math.sin(a) * r;
-  if ((z < -5.5 && Math.abs(x) < 8) || Math.hypot(x + 6.5, z + 3.5) < 2.5) continue;
+  if ((z < -5.5 && Math.abs(x) < 8) || (z > -6.5 && z < -2.5 && x > -10 && x < 0)) continue;
   mk(sph(.16, 10, 8), M(petals[i % 4], .9), [x, .16, z]);
 }
 const clouds = new THREE.Group(); scene.add(clouds);
@@ -159,12 +173,12 @@ function badge(l) {
     g.fillStyle = l.color; g.beginPath(); g.roundRect(16, 16, 224, 224, 64); g.fill();
     g.fillStyle = '#fff'; g.textAlign = 'center';
     g.font = '100px serif'; g.fillText(l.emoji, 128, 140);
-    g.font = 'bold 34px ui-rounded, system-ui, sans-serif'; g.fillText(l.label, 128, 207);
+    g.font = `bold ${l.label.length > 10 ? 26 : 34}px ui-rounded, system-ui, sans-serif`; g.fillText(l.label, 128, 207);
   });
 }
 const SPOTS = [
   ...LINKS.map((l, i) => ({ ...l, x: (i - (LINKS.length - 1) / 2) * 5.2, z: -9 })),
-  { label: 'Projects', emoji: '🗂️', color: '#4f9d69', x: -6.5, z: -3.5, panel: true },
+  ...PROJECTS.map((p, i) => ({ label: p.name, emoji: p.emoji, color: '#4f9d69', x: -7.5 + i * 3.4, z: -4.8, panel: true, proj: i })),
 ];
 const stations = SPOTS.map(l => {
   mk(cyl(1.1, 1.3, .7), M(0xefe3c8), [l.x, .35, l.z]);
@@ -175,6 +189,59 @@ const stations = SPOTS.map(l => {
   return { ...l, sign, hover: false };
 });
 
+// ---- fishing, acorns, sky extras, drawer ----
+const POND = { x: -7, z: 5, r: 2.6 };
+const fishing = createFishing({ scene, pond: POND, toast, sound });
+const act = () => nearby ? open(nearby) : pondNear && fishing.press();
+const got = new Set(JSON.parse(localStorage.getItem('island.acorns') || '[]'));
+const acorns = [[-12, 2], [11, -6], [0, 12], [-4, -12], [9, 9]].map(([x, z], i) => {
+  const g = new THREE.Group();
+  mk(sph(.18, 12, 10), M(0xf0b030, .3), [0, 0, 0], g); mk(sph(.13, 10, 8), M(0xb8862a, .6), [0, .14, 0], g).scale.y = .6;
+  g.position.set(x, .5, z); g.visible = !got.has(i); scene.add(g); return g;
+});
+const meteor = new THREE.Sprite(new THREE.SpriteMaterial({ color: 0xffffff, fog: false, transparent: true, opacity: 0, depthWrite: false }));
+meteor.scale.setScalar(1.6); scene.add(meteor);
+let mt = -1; const mv = new V();
+const rb = new THREE.Group();
+['#e0525a', '#f08a3c', '#f2c94c', '#6cc070', '#4aa3df', '#5a6fd0', '#9a6bd0'].forEach((c, i) => rb.add(new THREE.Mesh(new THREE.TorusGeometry(42 + i * 1.1, .55, 6, 64, Math.PI), new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0, fog: false, depthWrite: false }))));
+rb.position.set(14, -3, -62); scene.add(rb);
+let rbT = 0, prevWx = 'clear';
+function worldFx(dt, t) {
+  if (prevWx === 'rain' && wx !== 'rain' && !night) rbT = 90; // rainbow after real rain
+  prevWx = wx; rbT = Math.max(0, rbT - dt);
+  const ro = clamp(rbT / 8, 0, 1) * .5; rb.children.forEach(r => r.material.opacity = ro);
+  if (mt < 0 && night && !cold && wx === 'clear' && Math.random() < dt * .12) { mt = 0; meteor.position.set(rand(-30, 40), rand(40, 60), -80); mv.set(-70, -28, 0); }
+  if (mt >= 0) { mt += dt; meteor.position.addScaledVector(mv, dt); meteor.material.opacity = Math.sin(Math.PI * Math.min(mt, 1)); if (mt > 1) { mt = -1; meteor.material.opacity = 0; } }
+  if (state !== 'play') return;
+  acorns.forEach((g, i) => {
+    g.rotation.y += dt * 2; g.position.y = .5 + Math.sin(t * 2.5 + i) * .1;
+    if (g.visible && Math.hypot(me.mesh.position.x - g.position.x, me.mesh.position.z - g.position.z) < 1.3) {
+      g.visible = false; got.add(i); localStorage.setItem('island.acorns', JSON.stringify([...got]));
+      sound.chime(); toast(`🌰 Golden acorn ${got.size}/5`, '#f0b030');
+      if (got.size === 5) { me.crowned = true; setType(me, me.type); toast('👑 All five found! Crown unlocked', '#f0b030'); }
+    }
+  });
+}
+let snap = false;
+function takePhoto() {
+  const c = document.createElement('canvas'); c.width = canvas.width; c.height = canvas.height;
+  const g = c.getContext('2d'); g.drawImage(canvas, 0, 0);
+  const h = c.height * .09; g.fillStyle = 'rgba(251,247,238,.92)'; g.fillRect(0, c.height - h, c.width, h);
+  g.fillStyle = '#2f4a3a'; g.font = `800 ${h * .4}px ui-rounded, system-ui, sans-serif`; g.textAlign = 'center';
+  g.fillText(`Erdian's little island · ${night ? 'night' : 'day'}, ${cold ? 'cold' : 'warm'} · ${new Date().toLocaleDateString()}`, c.width / 2, c.height - h * .36);
+  c.toBlob(async b => {
+    const f = new File([b], 'island-postcard.png', { type: 'image/png' });
+    if (navigator.canShare && navigator.canShare({ files: [f] })) { try { await navigator.share({ files: [f] }); return; } catch {} }
+    const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = f.name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  });
+  toast('📸 Postcard saved');
+}
+$('#b-gear').onclick = e => { $('#drawer').classList.toggle('hidden'); e.currentTarget.blur(); };
+$('#b-lite').textContent = lite ? '🪶 Lite: on' : '🪶 Lite: off';
+$('#b-lite').onclick = () => { prefs.lite = !lite; savePrefs(); location.reload(); };
+$('#b-photo').onclick = () => { snap = true; $('#drawer').classList.add('hidden'); };
+document.querySelectorAll('#emotes button').forEach(b => b.onclick = () => { say(me, b.dataset.e); net.say(b.dataset.e); b.blur(); });
+
 // ---- projects panel ----
 let panelOpen = false;
 const panel = $('#projects');
@@ -182,13 +249,28 @@ $('#plist').innerHTML = PROJECTS.map(p => `<a class="proj" href="${p.url}" targe
 let activePanel;
 function openPanel(el = panel) { activePanel = el; panelOpen = true; el.classList.remove('hidden'); el.querySelector('.x').focus(); }
 function closePanel() { panelOpen = false; activePanel && activePanel.classList.add('hidden'); }
+function openProject(i) {
+  openPanel();
+  const cards = document.querySelectorAll('.proj');
+  cards.forEach((c, j) => c.classList.toggle('hl', j === i));
+  cards[i] && cards[i].scrollIntoView({ block: 'nearest' });
+}
 const aiPanel = $('#ai');
-[panel, aiPanel].forEach(p => { p.querySelector('.x').onclick = closePanel; p.addEventListener('pointerdown', e => { if (e.target === p) closePanel(); }); });
-const ai = initAI({ system: `You are Pip, a friendly little bunbot living on Erdian's island homepage. Answer briefly (max 3 sentences) and warmly, using only these facts about Erdian's projects: ${PROJECTS.map(p => `${p.name}: ${p.desc} (${p.tags.join(', ')})`).join('; ')}. If you do not know, say so.` });
-const open = s => { sound.chime(); return s.panel ? openPanel() : window.open(s.url, '_blank', 'noopener'); };
-$('#links').innerHTML = LINKS.map(l => `<a href="${l.url}" target="_blank" rel="noopener">${l.emoji} ${l.label}</a>`).join('') + '<button id="nav-proj">🗂️ Projects</button><button id="nav-ai">🧠 Ask Pip</button>';
+[panel, aiPanel, $('#dex')].forEach(p => { p.querySelector('.x').onclick = closePanel; p.addEventListener('pointerdown', e => { if (e.target === p) closePanel(); }); });
+const KNOW = [
+  { k: ['hi', 'hello', 'hey', 'yo'], a: "Hi! I'm Pip 🐰 Ask me about Erdian's projects or where to find him online." },
+  { k: ['who', 'erdian', 'yourself', 'bio'], a: 'Erdian builds things for the web. The Projects board has the details, and the links up top lead to his profiles.' }, // edit me
+  { k: ['projects', 'project', 'work', 'working', 'built', 'made', 'portfolio'], a: 'Projects: ' + PROJECTS.map(p => p.name).join(', ') + '. Ask me about any of them!' },
+  { k: ['contact', 'reach', 'email', 'hire', 'message', 'links'], a: 'Easiest is the links along the top: ' + LINKS.map(l => l.label).join(', ') + '.' },
+  ...PROJECTS.map(p => ({ k: [p.name.toLowerCase(), ...p.name.toLowerCase().split(' '), ...p.tags.map(t => t.toLowerCase())], a: `${p.emoji} ${p.name}: ${p.desc} Built with ${p.tags.join(', ')}. ${p.url}` })),
+  ...LINKS.map(l => ({ k: [l.label.toLowerCase()], a: `${l.emoji} ${l.label}: ${l.url}` })),
+];
+const ai = initAI({ know: KNOW, chips: ['What projects are there?', ...PROJECTS.map(p => p.name), 'How can I reach Erdian?'], system: `You are Pip, a friendly little bunbot living on Erdian's island homepage. Answer briefly (max 3 sentences) and warmly, using only these facts about Erdian's projects: ${PROJECTS.map(p => `${p.name}: ${p.desc} (${p.tags.join(', ')})`).join('; ')}. If you do not know, say so.` });
+const open = s => { sound.chime(); return s.panel ? openProject(s.proj) : window.open(s.url, '_blank', 'noopener'); };
+$('#links').innerHTML = LINKS.map(l => `<a href="${l.url}" target="_blank" rel="noopener">${l.emoji} ${l.label}</a>`).join('') + '<button id="nav-proj">🗂️ Projects</button><button id="nav-ai">🧠 Ask Pip</button><button id="nav-fish">🐟 Fish</button>';
 $('#nav-proj').onclick = () => openPanel();
-$('#nav-ai').onclick = () => { openPanel(aiPanel); ai.prep(); };
+$('#nav-ai').onclick = () => openPanel(aiPanel);
+$('#nav-fish').onclick = () => { renderDex($('#dex-grid'), fishing.dex); openPanel($('#dex')); };
 
 // ---- characters ----
 const KINDS = {
@@ -245,9 +327,11 @@ function makePlayer(type, name) {
 function setType(o, type) {
   if (o.core) o.mesh.remove(o.core);
   Object.assign(o, build(type), { type });
+  if (o.crowned) mk(new THREE.ConeGeometry(.16, .2, 5), M(0xf0b030, .3), [0, KINDS[type].k === 'b' ? 1.65 : 1.25, 0], o.core);
   o.mesh.add(o.core);
 }
 function say(o, msg) {
+  if (EMO.includes(msg)) o.emo = 1.6;
   o.b.textContent = msg; o.b.classList.add('on');
   clearTimeout(o.to); o.to = setTimeout(() => o.b.classList.remove('on'), 4200);
 }
@@ -273,7 +357,8 @@ function animate(o, dt, t) {
   const hop = !air && o.moving ? Math.abs(Math.sin(t * 10)) * (bot ? .08 : .22) : 0;
   o.land *= Math.exp(-dt * 9);
   const s = air ? 1 + Math.min(Math.abs(o.vy) * .018, .25) : 1 - o.land + Math.sin(t * 3) * .015;
-  o.core.position.y = o.y + hop + (bot ? Math.sin(t * 3) * .04 : 0);
+  if (o.emo > 0) { o.emo -= dt; o.core.rotation.y += dt * 9; } else o.core.rotation.y = 0;
+  o.core.position.y = o.y + hop + (o.emo > 0 ? Math.abs(Math.sin(t * 9)) * .3 : 0) + (bot ? Math.sin(t * 3) * .04 : 0);
   o.core.scale.set(1 / Math.sqrt(s), s, 1 / Math.sqrt(s));
   o.hands.forEach((h, i) => { h.position.z = .12 + (o.moving ? Math.sin(t * 10 + i * Math.PI) * .15 : 0); });
 }
@@ -297,10 +382,12 @@ $('#b-net').onclick = async e => {
 };
 
 // ---- flow ----
-let state = 'intro', sel = 'slime', me, npcs = [], nextHop = 0, nearby = null;
+let state = 'intro', sel = prefs.avatar || 'slime', me, npcs = [], nextHop = 0, nearby = null;
 $('#go').onclick = () => {
   sound.start(); state = 'pick'; $('#intro').classList.add('hidden'); $('#pick').classList.remove('hidden');
   me = makePlayer(sel, 'You');
+  if (got.size >= 5) { me.crowned = true; setType(me, sel); }
+  document.querySelectorAll('.pick').forEach(x => x.classList.toggle('on', x.dataset.t === sel));
 };
 document.querySelectorAll('.pick').forEach(b => b.onclick = () => {
   document.querySelectorAll('.pick').forEach(x => x.classList.toggle('on', x === b));
@@ -308,6 +395,7 @@ document.querySelectorAll('.pick').forEach(b => b.onclick = () => {
 });
 $('#start').onclick = () => {
   state = 'play'; $('#pick').classList.add('hidden'); $('#hud').classList.remove('hidden');
+  prefs.avatar = sel; savePrefs(); if (location.hash.includes('projects')) setTimeout(() => openPanel(), 900);
   me.mesh.rotation.y = Math.PI;
   [['pip', 'Pip', -9, -2], ['mochi', 'Momo', 8, 3]].forEach(([t, n, x, z], i) => {
     const o = makePlayer(t, n); o.mesh.position.set(x, 0, z);
@@ -327,7 +415,7 @@ addEventListener('keydown', e => {
   if (k === 'n') toggleTod();
   if (k === 't') toggleTemp();
   if (state !== 'play') return;
-  if (k === 'e' && nearby) open(nearby);
+  if (k === 'e') act();
   if (e.code === 'Space') { e.preventDefault(); jump(); }
   if (e.key === 'Enter') { e.preventDefault(); $('#msg').focus(); }
   keys.add(k);
@@ -342,7 +430,7 @@ $('#chat').addEventListener('submit', e => {
   if (coarse) $('#msg').blur();
 });
 $('#jump').addEventListener('pointerdown', jump);
-$('#prompt').onclick = e => { if (nearby) open(nearby); e.currentTarget.blur(); };
+$('#prompt').onclick = e => { act(); e.currentTarget.blur(); };
 
 const joyEl = $('#joy'), knob = joyEl.firstElementChild;
 let joyId = null;
@@ -367,12 +455,13 @@ const hit = e => {
   const h = ray.intersectObjects(stations.map(s => s.sign))[0];
   return h && stations.find(s => s.sign === h.object);
 };
-let drag = null;
+let drag = null, walkTo = null, tap = null;
 canvas.addEventListener('pointerdown', e => {
   if (state !== 'play') return;
   const s = hit(e);
   if (s) return open(s);
   drag = { x: e.clientX, y: e.clientY }; canvas.style.cursor = 'grabbing';
+  tap = { x: e.clientX, y: e.clientY, t: performance.now() };
 });
 canvas.addEventListener('pointermove', e => {
   if (state !== 'play') return;
@@ -386,7 +475,13 @@ canvas.addEventListener('pointermove', e => {
     canvas.style.cursor = s ? 'pointer' : 'grab';
   }
 });
-addEventListener('pointerup', () => { drag = null; canvas.style.cursor = 'grab'; });
+addEventListener('pointerup', e => {
+  if (tap && state === 'play' && !panelOpen && Math.hypot(e.clientX - tap.x, e.clientY - tap.y) < 8 && performance.now() - tap.t < 300) {
+    mp.set(e.clientX / innerWidth * 2 - 1, -(e.clientY / innerHeight) * 2 + 1); ray.setFromCamera(mp, camera);
+    const pt = new V(); if (ray.ray.intersectPlane(new THREE.Plane(new V(0, 1, 0), 0), pt)) walkTo = pt; // tap to walk
+  }
+  tap = null; drag = null; canvas.style.cursor = 'grab';
+});
 canvas.addEventListener('wheel', e => { dist = clamp(dist + e.deltaY * .01, 5, 14); }, { passive: true });
 addEventListener('resize', () => {
   camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
@@ -394,11 +489,12 @@ addEventListener('resize', () => {
 });
 
 // ---- loop ----
-let lastSk = '', stepT = 0;
+let lastSk = '', stepT = 0, pondNear = false;
 const clock = new THREE.Clock(), look = new V(0, 1, 0), pv = new V(), c1 = new THREE.Color();
 const vis = y => clamp((y + 4) / 14, 0, 1);
 renderer.setAnimationLoop(() => {
   const dt = Math.min(clock.getDelta(), .05), t = clock.elapsedTime;
+  if (panelOpen && activePanel === aiPanel) return; // free the GPU for the on-device model
 
   // mood blending
   const T = P[key()], a = 1 - Math.exp(-dt * 2.2);
@@ -454,15 +550,21 @@ renderer.setAnimationLoop(() => {
     const ix = lock ? 0 : (keys.has('d') || keys.has('arrowright') ? 1 : 0) - (keys.has('a') || keys.has('arrowleft') ? 1 : 0) + joy.x;
     const iz = lock ? 0 : (keys.has('w') || keys.has('arrowup') ? 1 : 0) - (keys.has('s') || keys.has('arrowdown') ? 1 : 0) - joy.y;
     const sy = Math.sin(yaw), cy = Math.cos(yaw), cp = Math.cos(pitch), p = me.mesh.position;
-    step(me, ix * cy - iz * sy, -ix * sy - iz * cy, dt);
+    let mx = ix * cy - iz * sy, mz = -ix * sy - iz * cy;
+    if (Math.hypot(mx, mz) > .05) walkTo = null;
+    else if (walkTo) { const dx = walkTo.x - p.x, dz = walkTo.z - p.z; if (Math.hypot(dx, dz) < .35) walkTo = null; else { mx = dx; mz = dz; } }
+    step(me, mx, mz, dt);
     tp = [p.x + sy * cp * dist, Math.sin(pitch) * dist + 1, p.z + cy * cp * dist]; tl = [p.x, 1.1, p.z];
 
     nearby = null;
     let best = 2.8;
     for (const s of stations) { const d = Math.hypot(p.x - s.x, p.z - s.z); if (d < best) { best = d; nearby = s; } }
     const pr = $('#prompt');
-    pr.classList.toggle('hidden', !nearby || panelOpen);
+    pondNear = !nearby && Math.hypot(p.x - POND.x, p.z - POND.z) < 4.2;
+    if (!pondNear && fishing.active()) fishing.cancel();
+    pr.classList.toggle('hidden', !(nearby || pondNear) || panelOpen);
     if (nearby) pr.textContent = `${nearby.emoji} Open ${nearby.label}${coarse ? '' : ' · E'}`;
+    else if (pondNear) pr.textContent = fishing.label() + (coarse ? '' : ' · E');
 
     for (const n of npcs) {
       n.t -= dt;
@@ -479,7 +581,9 @@ renderer.setAnimationLoop(() => {
   look.lerp(pv.set(...tl), k);
   camera.lookAt(look);
 
+  worldFx(dt, t); fishing.update(dt, t);
   net.tick(dt, me, state === 'play');
   for (const o of [me, ...npcs.map(n => n.o), ...net.list()]) if (o) { animate(o, dt, t); if (state !== 'intro') place(o); }
   renderer.render(scene, camera);
+  if (snap) { snap = false; takePhoto(); }
 });

@@ -22,6 +22,12 @@ export const sound = {
     const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 1800;
     rainG = ctx.createGain(); rainG.gain.value = 0; noise(false).connect(hp).connect(rainG).connect(master);
     sound.set(mood.night, mood.cold, mood.wx);
+    const SC = { dw: [262, 294, 330, 392, 440, 523], dc: [392, 440, 523, 587, 659, 784], nw: [196, 233, 262, 311, 349, 392], nc: [523, 622, 698, 784, 932, 1047] };
+    setInterval(() => { // generative pentatonic, scale follows the world mood
+      if (Math.random() > .6) return;
+      const sc = SC[(mood.night ? 'n' : 'd') + (mood.cold ? 'c' : 'w')], f = sc[Math.floor(Math.random() * sc.length)];
+      blip(f, 1.6, .025); if (Math.random() < .4) blip(f * 1.5, 1.2, .012, f * 1.5, 'sine', .25);
+    }, 1700);
     setInterval(() => {
       const { night, cold, wx } = mood;
       if (cold || wx === 'rain') return;
@@ -35,6 +41,7 @@ export const sound = {
     windG.gain.setTargetAtTime(.1 + (cold ? .1 : 0) + (wx === 'rain' ? .04 : 0), ctx.currentTime, 1.5);
     rainG.gain.setTargetAtTime(wx === 'rain' ? .22 : 0, ctx.currentTime, 1.5);
   },
+  splash: () => blip(260, .25, .05, 70, 'triangle'),
   step: soft => blip(soft ? 220 : 150, .05, soft ? .02 : .05, 60, 'triangle'),
   jump: () => blip(300, .15, .05, 650),
   chime: () => { blip(784, .5, .07); blip(1047, .6, .06, 1047, 'sine', .12); },
