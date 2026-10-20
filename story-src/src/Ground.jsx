@@ -17,7 +17,7 @@ void main(){
   vec3 grass = mix(vec3(.45,.74,.36), vec3(.58,.82,.42), n(vXZ*2.));
   csm_DiffuseColor = vec4(mix(rot, grass, heal), 1.);
 }`;
-export function Ground({ size = 40 }) {
+export function Ground({ w = 40, h = 40 }) {
   const m = useRef();
   useFrame((s, dt) => {
     const u = m.current && m.current.uniforms; if (!u) return;
@@ -26,7 +26,7 @@ export function Ground({ size = 40 }) {
   });
   return (
     <mesh rotation={[-Math.PI / 2, 0, 0]}>
-      <planeGeometry args={[size, size]} />
+      <planeGeometry args={[w, h]} />
       <CustomShaderMaterial ref={m} baseMaterial={THREE.MeshStandardMaterial} vertexShader={vs} fragmentShader={fs}
         uniforms={{ uTrust: { value: 0 }, uTime: { value: 0 } }} roughness={1} />
     </mesh>

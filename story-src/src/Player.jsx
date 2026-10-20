@@ -8,18 +8,19 @@ import { avatar, playerPos, useStory } from './state';
 
 const wrap = a => Math.atan2(Math.sin(a), Math.cos(a));
 const tmp = new THREE.Vector3();
-export function Player({ start = [0, 1.5, 14] }) {
+export function Player({ start = [0, 1.5, 52] }) {
   const body = useRef(), model = useRef(), yaw = useRef(Math.PI);
   const [, get] = useKeyboardControls();
   useFrame(({ camera }, dt) => {
     const b = body.current; if (!b) return;
-    const s = useStory.getState(), busy = s.dialog || s.choice || s.ended, k = get(), v = b.linvel();
+    const s = useStory.getState(), busy = s.ended, k = get(), v = b.linvel();
     let mx = busy ? 0 : (k.right ? 1 : 0) - (k.left ? 1 : 0), mz = busy ? 0 : (k.back ? 1 : 0) - (k.forward ? 1 : 0);
-    const l = Math.hypot(mx, mz);
-    if (l > 0) { mx /= l; mz /= l; yaw.current += wrap(Math.atan2(mx, mz) - yaw.current) * Math.min(1, dt * 12); }
+    const l = Math.hypot(mx, mz), sp = s.slow > 0 ? 2 : 5;            // ink pools slow you down
+    if (l > 0) { mx /= l; mz /= l; yaw.current += wrap(Math.atan2(mx, mz) - yaw.current) * Math.min(1, dt * 12); useStory.setState({ last: performance.now() }); }
     const jump = !busy && k.jump && Math.abs(v.y) < .1;
-    b.setLinvel({ x: mx * 5, y: jump ? 8 : v.y, z: mz * 5 }, true);
+    b.setLinvel({ x: mx * sp, y: jump ? 8 : v.y, z: mz * sp }, true);
     const p = b.translation();
+    if (p.y < -8) b.setTranslation({ x: 0, y: 2, z: playerPos.z }, true);
     playerPos.set(p.x, p.y, p.z);
     model.current.rotation.y = yaw.current;
     camera.position.lerp(tmp.set(p.x, p.y + 7, p.z + 9), 1 - Math.exp(-dt * 5));
