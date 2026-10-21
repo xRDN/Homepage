@@ -11,11 +11,16 @@ import { playerPos, useStory, pipSay, card } from './state';
 import { chime, pop } from './audio';
 import { Town, Dress } from './Town';
 import { Chest, Debris, Pyramid, Barrel, Lamps } from './Props';
+import { Terrain } from './Terrain';
+import { Water } from './Water';
+import { Flora } from './Flora';
+import { Quay, Bridge } from './Structures';
+import { ISLANDS } from './world';
 
 // Five beats along one long street (z runs from +52 at the start to -68 at the Clock):
 // 1 toll street · 2 under-archive · 3 ghost payroll rooftops · 4 counting house · 5 the square.
-const TARGET = [3, 1, 2], SLOT_X = [-6, 0, 6], SLOT_Z = -38, BOARD = [8, -58], STAMPS = [[-8, -54], [-4, -54]];
-const PAGES = [[-11, .9, 21.5], [-10, 2.8, 11], [7, 5.4, -21.5]];
+const TARGET = [3, 1, 2], SLOT_X = [-6, 0, 6], SLOT_Z = -70, BOARD = [8, -110], STAMPS = [[-8, -106], [-4, -106]];
+const PAGES = [[-11, .9, 21.5], [-10, 2.8, 11], [7, 5.4, -37.5]];
 const near = (x, z, r) => Math.hypot(playerPos.x - x, playerPos.z - z) < r;
 
 const Box = ({ p, s, c = '#8b7e70' }) => (
@@ -33,10 +38,10 @@ function Gate({ i, x }) {
     const g = [...S.gates]; g[i] = true; S.progress({ gates: g }); S.addTrust(5); pop(); pipSay('🪙✋', 'Pip: that toll is stopped.', 2200);
   };
   return (<>
-    {!open && <Box p={[x, 1, 36]} s={[4, 2, .4]} c="#c0504d" />}
-    <Chest i={i} x={x * 1.7} />
+    {!open && <Box p={[x, 1, 38]} s={[4, 2, .4]} c="#c0504d" />}
+    <Chest i={i} x={x * 2.1} />
     {open && <Debris x={x} />}
-    <RigidBody type="fixed" colliders={false} position={[x, .8, 37.2]}>
+    <RigidBody type="fixed" colliders={false} position={[x, .8, 39.2]}>
       <CuboidCollider args={[1.8, .8, .7]} sensor onIntersectionEnter={e => e.other.rigidBodyObject?.name === 'cart' && jam()} />
     </RigidBody>
   </>);
@@ -71,7 +76,7 @@ function LoafDemo() {
     loaf.current.position.set(0, .9, -t * 8); loaf.current.scale.setScalar(1 - k * .25);
   });
   return (
-    <group position={[-13, 0, 46]}>
+    <group position={[-8, 0, 50]}>
       <mesh ref={loaf}><capsuleGeometry args={[.3, .4, 6, 10]} /><meshStandardMaterial color="#d9a05b" /></mesh>
       {[2, 4, 6].map(z => <group key={z} position={[1.2, 0, -z]}>
         <mesh position={[0, .6, 0]}><boxGeometry args={[.4, 1.2, .4]} /><meshStandardMaterial color="#c0504d" /></mesh><Bubble y={1.8} icons="🪙" /></group>)}
@@ -85,8 +90,8 @@ function LoafDemo() {
 function HatWall() {
   const hats = useMemo(() => Array.from({ length: 40 }, (_, i) => [7 - 4.5 + (i % 8) * 1.28, 5.5 + Math.floor(i / 8) * .72]), []);
   return (<>
-    <Box p={[7, 6.5, -25]} s={[10, 4, .3]} c="#a89a86" />
-    {hats.map(([x, y], i) => <group key={i} position={[x, y, -24.75]}>
+    <Box p={[7, 6.5, -40.5]} s={[10, 4, .3]} c="#a89a86" />
+    {hats.map(([x, y], i) => <group key={i} position={[x, y, -40.25]}>
       <mesh position={[0, .12, 0]}><coneGeometry args={[.22, .3, 10]} /><meshStandardMaterial color="#3a3a46" /></mesh>
       <mesh><cylinderGeometry args={[.36, .36, .05, 12]} /><meshStandardMaterial color="#3a3a46" /></mesh></group>)}
   </>);
@@ -95,7 +100,7 @@ function HatWall() {
 function Slots() {
   const slots = useStory(s => s.slots), solved = useStory(s => s.solved);
   return (<>
-    <Box p={[0, 2, -45.6]} s={[14, 3, .3]} c={solved ? '#d8e8c8' : '#9a8a7a'} />
+    <Box p={[0, 2, -77.6]} s={[14, 3, .3]} c={solved ? '#d8e8c8' : '#9a8a7a'} />
     {SLOT_X.map((x, i) => (<group key={i}>
       <mesh position={[x, .4, SLOT_Z]}><cylinderGeometry args={[.9, 1, .8, 20]} /><meshStandardMaterial color={slots[i] === TARGET[i] ? '#8fcf6b' : '#c9b79a'} /></mesh>
       <Html position={[x, 3, SLOT_Z]} center style={{ pointerEvents: 'none' }}><div className="bub">{'🪙'.repeat(TARGET[i])}</div></Html>
@@ -114,7 +119,7 @@ function Clock() {
     if (g > 0 && hand.current) hand.current.rotation.z -= dt * .8;
   });
   return (
-    <group position={[0, 0, -64]}>
+    <group position={[0, 0, -136]}>
       <mesh position={[0, 3.5, 0]}><boxGeometry args={[3, 7, 3]} /><meshStandardMaterial color="#9a8a7a" roughness={.9} /></mesh>
       <mesh position={[0, 5.6, 1.55]} rotation={[Math.PI / 2, 0, 0]}><cylinderGeometry args={[1.2, 1.2, .1, 32]} /><meshStandardMaterial color="#f4ecd8" /></mesh>
       <group ref={hand} position={[0, 5.6, 1.65]}><mesh position={[0, .45, 0]}><boxGeometry args={[.1, .9, .06]} /><meshStandardMaterial color="#3a3a46" /></mesh></group>
@@ -131,15 +136,15 @@ function Crowd() {
     const k = 1 - Math.exp(-dt * 1.5), tx = BOARD[0] + Math.cos(s.a) * s.r, tz = BOARD[1] + 1 + Math.sin(s.a) * s.r;
     m.position.x += (tx - m.position.x) * k; m.position.z += (tz - m.position.z) * k; m.position.y = .5 + Math.abs(Math.sin(clock.elapsedTime * 3 + i)) * .05;
   }));
-  return spec.map((s, i) => <mesh key={i} ref={el => (refs.current[i] = el)} position={[0, .5, -48]} visible={false}><capsuleGeometry args={[.3, .5, 6, 10]} /><meshStandardMaterial color={s.c} /></mesh>);
+  return spec.map((s, i) => <mesh key={i} ref={el => (refs.current[i] = el)} position={[0, .5, -98]} visible={false}><capsuleGeometry args={[.3, .5, 6, 10]} /><meshStandardMaterial color={s.c} /></mesh>);
 }
 function hint(S) {
   if (S.ended) return null;
-  if (S.stage === 0) return S.gates[0] ? [5, 40] : [-5, 40];
+  if (S.stage === 0) return S.gates[0] ? [5, 44] : [-5, 44];
   if (S.stage === 1) return !S.got[0] ? [-11, 21.5] : [-10, 11];
-  if (S.stage === 2) return [7, -20];
-  if (S.stage === 3) return [0, -37];
-  return S.stamp ? null : [-6, -54];
+  if (S.stage === 2) return [7, -36];
+  if (S.stage === 3) return [0, -70];
+  return S.stamp ? null : [-6, -106];
 }
 // Pip follows you; after 20s without progress he hops toward the next objective, after 45s sparkles mark it.
 function Pip() {
@@ -165,7 +170,7 @@ function Pip() {
 
 export function Ashmarket() {
   const lite = useStory(s => s.lite), solved = useStory(s => s.solved), root = useRef();
-  useEffect(() => { root.current && root.current.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } }); }, []);
+  useEffect(() => { root.current && root.current.traverse(o => { if (o.isMesh && !o.userData.noShadow) { o.castShadow = true; o.receiveShadow = true; } }); }, []);
   useEffect(() => { card('I · Ashmarket', 3000); }, []);
   const interact = useCallback(() => {
     const S = useStory.getState(); if (S.ended) return;
@@ -198,20 +203,21 @@ export function Ashmarket() {
   });
   return (
     <group ref={root}>
-      <group position={[0, 0, -7]}><Ground w={44} h={130} /></group>
-      <Town /><Lamps />
-      <Pyramid x={-15} z={44} /><Pyramid x={15} z={33} /><Pyramid x={11} z={-34} />
-      {[[-16, .5, 30], [-15, .5, 31.2], [16, .5, 46], [13, .5, 15], [-12, .5, -3], [-12, .5, -50], [14, .5, -44], [5, .5, -50]].map((p, i) => <Barrel key={i} p={p} />)}
-      <RigidBody type="fixed"><CuboidCollider args={[22, .5, 65]} position={[0, -.5, -7]} /></RigidBody>
+      <Terrain /><Water /><Flora />
+      {ISLANDS.map((i, k) => <Quay key={k} {...i} />)}
+      <Bridge x={-5} z={38} len={4} /><Bridge x={5} z={38} len={4} />
+      <Bridge x={0} z={-3} len={6} /><Bridge x={0} z={-47} len={6} /><Bridge x={0} z={-93} len={6} />
       <RigidBody type="fixed" colliders={false}>
-        <CuboidCollider args={[22, 3, .5]} position={[0, 3, 57]} /><CuboidCollider args={[22, 3, .5]} position={[0, 3, -71]} />
-        <CuboidCollider args={[.5, 3, 65]} position={[22, 3, -7]} /><CuboidCollider args={[.5, 3, 65]} position={[-22, 3, -7]} />
+        <CuboidCollider args={[48, 6, .5]} position={[0, 4, 84]} /><CuboidCollider args={[48, 6, .5]} position={[0, 4, -156]} />
+        <CuboidCollider args={[.5, 6, 120]} position={[48, 4, -36]} /><CuboidCollider args={[.5, 6, 120]} position={[-48, 4, -36]} />
       </RigidBody>
+      <Town /><Lamps />
+      <Pyramid x={-9} z={47} /><Pyramid x={9} z={32} /><Pyramid x={11} z={-104} />
+      {[[-8, .5, 52], [-7, .5, 53.2], [10, .5, 53], [-10, .5, -16], [-12, .5, -30], [14, .5, -110], [6, .5, -116], [-12, .5, -114]].map((p, i) => <Barrel key={i} p={p} />)}
 
-      {/* beat 1: toll street */}
-      <Box p={[-14, 1, 36]} s={[14, 2, .5]} /><Box p={[0, 1, 36]} s={[6, 2, .5]} /><Box p={[14, 1, 36]} s={[14, 2, .5]} />
+      {/* beat 1: toll plaza and two toll bridges */}
       <Gate i={0} x={-5} /><Gate i={1} x={5} />
-      {[[-5, .5, 46], [5, .5, 46], [0, .5, 43]].map((p, i) => <Crate key={i} p={p} name="cart" />)}
+      {[[-5, .5, 48], [5, .5, 48], [0, .5, 45]].map((p, i) => <Crate key={i} p={p} name="cart" />)}
       <LoafDemo />
 
       {/* beat 2: under-archive, a zig-zag of shelves with ink pools */}
@@ -223,18 +229,18 @@ export function Ashmarket() {
       <Box p={[-10, 1.1, 11]} s={[4, 2.2, 4]} c="#a89a86" />
       <Crate p={[3, .5, 11]} name="crate" /><Crate p={[5, .5, 10.4]} name="crate" />
 
-      {/* beat 3: rooftops to the ghost payroll */}
-      <Box p={[0, .5, 5]} s={[3, 1, 2]} c="#b9a58c" /><Box p={[0, 1, 3]} s={[3, 2, 2]} c="#b9a58c" />
-      <Box p={[0, 1.5, -.5]} s={[5, 3, 5]} c="#c9b79a" /><Box p={[0, 1.75, -8]} s={[5, 3.5, 5]} c="#b9a58c" />
-      <Box p={[7, 2, -14]} s={[5, 4, 5]} c="#c9b79a" /><Box p={[7, 2.25, -22]} s={[5, 4.5, 5]} c="#b9a58c" />
+      {/* beat 3: townhouse rooftops to the ghost payroll */}
+      <Box p={[0, .5, -11]} s={[3, 1, 2]} c="#b9a58c" /><Box p={[0, 1, -13]} s={[3, 2, 2]} c="#b9a58c" />
+      <Box p={[0, 1.5, -16.5]} s={[5, 3, 5]} c="#c9b79a" /><Box p={[0, 1.75, -24]} s={[5, 3.5, 5]} c="#b9a58c" />
+      <Box p={[7, 2, -30]} s={[5, 4, 5]} c="#c9b79a" /><Box p={[7, 2.25, -38]} s={[5, 4.5, 5]} c="#b9a58c" />
       <HatWall />
-      <Dress p={[0, 1.5, -.5]} s={[5, 3, 5]} k={0} /><Dress p={[0, 1.75, -8]} s={[5, 3.5, 5]} k={1} /><Dress p={[7, 2, -14]} s={[5, 4, 5]} k={2} /><Dress p={[7, 2.25, -22]} s={[5, 4.5, 5]} k={3} />
+      <Dress p={[0, 1.5, -16.5]} s={[5, 3, 5]} k={0} /><Dress p={[0, 1.75, -24]} s={[5, 3.5, 5]} k={1} /><Dress p={[7, 2, -30]} s={[5, 4, 5]} k={2} /><Dress p={[7, 2.25, -38]} s={[5, 4.5, 5]} k={3} />
 
       {/* beat 4: counting house */}
-      <Box p={[-7.25, 1.25, -30]} s={[10.5, 2.5, .6]} c="#8a7a6a" /><Box p={[7.25, 1.25, -30]} s={[10.5, 2.5, .6]} c="#8a7a6a" />
-      <Box p={[-7.25, 1.25, -46]} s={[10.5, 2.5, .6]} c="#8a7a6a" /><Box p={[7.25, 1.25, -46]} s={[10.5, 2.5, .6]} c="#8a7a6a" />
-      <Box p={[-12.5, 1.25, -38]} s={[.6, 2.5, 16]} c="#8a7a6a" /><Box p={[12.5, 1.25, -38]} s={[.6, 2.5, 16]} c="#8a7a6a" />
-      {!solved && <Box p={[0, 1.25, -46]} s={[4, 2.5, .6]} c="#c0504d" />}
+      <Box p={[-7.25, 1.25, -62]} s={[10.5, 2.5, .6]} c="#8a7a6a" /><Box p={[7.25, 1.25, -62]} s={[10.5, 2.5, .6]} c="#8a7a6a" />
+      <Box p={[-7.25, 1.25, -78]} s={[10.5, 2.5, .6]} c="#8a7a6a" /><Box p={[7.25, 1.25, -78]} s={[10.5, 2.5, .6]} c="#8a7a6a" />
+      <Box p={[-12.5, 1.25, -70]} s={[.6, 2.5, 16]} c="#8a7a6a" /><Box p={[12.5, 1.25, -70]} s={[.6, 2.5, 16]} c="#8a7a6a" />
+      {!solved && <Box p={[0, 1.25, -78]} s={[4, 2.5, .6]} c="#c0504d" />}
       <Slots />
 
       {/* beat 5: the square */}
@@ -249,10 +255,9 @@ export function Ashmarket() {
       <Crowd />
 
       {PAGES.map((p, i) => <Page key={i} id={i} p={p} />)}
-      <Sparkles count={80} scale={[40, 8, 120]} position={[0, 4, -7]} size={2} speed={.3} color="#aab0b4" />
+      <Sparkles count={120} scale={[70, 10, 260]} position={[0, 4, -35]} size={2} speed={.3} color="#aab0b4" />
       <Pip />
       <Player />
-      {!lite && <ContactShadows position={[0, .02, 0]} opacity={.35} scale={44} blur={2.2} far={4} resolution={512} />}
     </group>
   );
 }

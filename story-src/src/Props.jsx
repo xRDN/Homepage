@@ -7,10 +7,10 @@ const rnd = (a, b) => a + Math.random() * (b - a);
 // the gate splintering into debris, crate pyramids and barrels to topple, lanterns that swing on rope joints.
 export function Chest({ i, x }) {
   const open = useStory(s => s.gates[i]), coins = useRef(), N = 24;
-  const inst = useMemo(() => Array.from({ length: N }, (_, k) => ({ key: `c${i}-${k}`, position: [x + rnd(-.4, .4), .25 + Math.floor(k / 8) * .13, 39 + rnd(-.3, .3)], rotation: [Math.PI / 2, 0, 0] })), [i, x]);
+  const inst = useMemo(() => Array.from({ length: N }, (_, k) => ({ key: `c${i}-${k}`, position: [x + rnd(-.4, .4), .25 + Math.floor(k / 8) * .13, 43 + rnd(-.3, .3)], rotation: [Math.PI / 2, 0, 0] })), [i, x]);
   useEffect(() => { if (open && coins.current) coins.current.forEach(b => b.setLinvel({ x: rnd(-3, 3), y: rnd(4, 8), z: rnd(-4, 3) }, true)); }, [open]);
   return (<>
-    <RigidBody type="fixed" position={[x, 0, 39]} colliders="cuboid">
+    <RigidBody type="fixed" position={[x, 0, 43]} colliders="cuboid">
       <mesh position={[0, .05, 0]}><boxGeometry args={[1.4, .1, 1.2]} /><meshStandardMaterial color="#7a5a3a" /></mesh>
       {[-.55, .55].map(z => <mesh key={z} position={[0, .3, z]}><boxGeometry args={[1.4, .5, .1]} /><meshStandardMaterial color="#7a5a3a" /></mesh>)}
       {[-.65, .65].map(a => <mesh key={a} position={[a, .3, 0]}><boxGeometry args={[.1, .5, 1.2]} /><meshStandardMaterial color="#7a5a3a" /></mesh>)}
@@ -21,7 +21,7 @@ export function Chest({ i, x }) {
   </>);
 }
 export function Debris({ x }) {
-  const bits = useMemo(() => Array.from({ length: 7 }, () => ({ p: [x + rnd(-1.5, 1.5), 1 + rnd(0, .8), 36], v: [rnd(-4, 4), rnd(3, 6), rnd(-3, 3)], a: [rnd(-6, 6), rnd(-6, 6), rnd(-6, 6)] })), [x]);
+  const bits = useMemo(() => Array.from({ length: 7 }, () => ({ p: [x + rnd(-1.5, 1.5), 1 + rnd(0, .8), 38], v: [rnd(-4, 4), rnd(3, 6), rnd(-3, 3)], a: [rnd(-6, 6), rnd(-6, 6), rnd(-6, 6)] })), [x]);
   return bits.map((b, k) => (
     <RigidBody key={k} position={b.p} colliders="cuboid" linearVelocity={b.v} angularVelocity={b.a}>
       <mesh castShadow><boxGeometry args={[.4, .3, .3]} /><meshStandardMaterial color={k % 2 ? '#c0504d' : '#e8e0d0'} /></mesh>
@@ -51,7 +51,7 @@ function Lamp({ p }) {
   </>);
 }
 export function Lamps() {
-  return [48, 40, -50].flatMap(z => [
+  return [50, 44, -102].flatMap(z => [
     <mesh key={'c' + z} position={[0, 4.2, z]}><boxGeometry args={[15.2, .06, .06]} /><meshStandardMaterial color="#222" /></mesh>,
     ...[-4, 0, 4].map(x => <Lamp key={z + '_' + x} p={[x, 4.2, z]} />),
   ]);

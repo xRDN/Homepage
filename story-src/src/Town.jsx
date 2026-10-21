@@ -52,7 +52,7 @@ function Banner({ p, color }) {
 function Fountain() {
   const m = useRef();
   useFrame(({ clock }) => { if (m.current) m.current.uniforms.uTime.value = clock.elapsedTime; });
-  return (<group position={[0, 0, -54]}>
+  return (<group position={[0, 0, -108]}>
     <RigidBody type="fixed" colliders={false}><CylinderCollider args={[.4, 2.8]} position={[0, .4, 0]} /></RigidBody>
     <mesh position={[0, .35, 0]} castShadow receiveShadow><cylinderGeometry args={[2.8, 3, .7, 32]} /><meshStandardMaterial color="#b9b0a2" roughness={.9} /></mesh>
     <mesh position={[0, .72, 0]} rotation={[-Math.PI / 2, 0, 0]}><circleGeometry args={[2.5, 48, 0, Math.PI * 2]} />
@@ -63,20 +63,20 @@ function Fountain() {
   </group>);
 }
 const HOUSES = [
-  [-18.5, 50, 5, 6, 5, 0, 1], [18.5, 48, 5, 7, 4.5, 1, 0], [-18.5, 40, 5, 6, 4, 2, 0], [18.5, 41, 5, 6, 5.5, 3, 1],
-  [-19, 3, 4, 6, 5, 4, 0], [19, 2, 4, 6, 4, 0, 0], [-17, -6, 5, 6, 5.5, 1, 1], [17, -14, 5, 6, 4.5, 2, 0],
-  [-17, -22, 5, 6, 5, 3, 0], [-17.5, -50, 5, 6, 5, 4, 1], [17.5, -48, 5, 6, 4.5, 0, 0], [-17, -62, 5, 6, 5.5, 1, 0], [17, -66, 5, 6, 5, 2, 1],
+  [-13, 63, 5, 6, 5, 0, 1], [13.5, 62, 5, 7, 4.5, 1, 0], [-9, 70, 5, 6, 4.5, 2, 0], [10, 70, 5, 6, 5.5, 3, 1],
+  [-14, -18, 5, 6, 5, 4, 0], [-14, -34, 5, 6, 4.5, 0, 1],
+  [-20, -108, 5, 6, 5, 3, 0], [20, -110, 5, 6, 5.5, 0, 1], [-19, -132, 5, 6, 4.5, 1, 0], [19, -134, 5, 6, 5, 2, 1],
 ];
 export function Town() {
   useTownFx();
-  const posts = useMemo(() => [52, 44, 30, 22, 14, 4, -6, -16, -26, -36, -50, -60].flatMap(z => [[-7.6, z], [7.6, z]]), []);
+  const posts = useMemo(() => [52, 44, -100, -110, -120, -130].flatMap(z => [[-7.6, z], [7.6, z]]), []);
   return (<>
     {HOUSES.map(([x, z, dx, dz, h, k, smoke], i) => <House key={i} x={x} z={z} dx={dx} dz={dz} h={h} k={k} smoke={!!smoke} />)}
     <Instances limit={32} castShadow><cylinderGeometry args={[.09, .11, 3.4, 8]} /><meshStandardMaterial color="#3a3a46" />
       {posts.map(([x, z], i) => <Instance key={i} position={[x, 1.7, z]} />)}</Instances>
     <Instances limit={32}><sphereGeometry args={[.28, 12, 10]} /><meshStandardMaterial color="#ffe3a3" emissive="#ffb347" emissiveIntensity={1.8} />
       {posts.map(([x, z], i) => <Instance key={i} position={[x, 3.5, z]} />)}</Instances>
-    {[[-8.5, 46, '#c0504d'], [8.5, 30, '#4a7fb0'], [-8.5, 12, '#e0a83c'], [8.5, -12, '#c0504d'], [-8.5, -28, '#4a7fb0'], [8.5, -52, '#e0a83c']].map(([x, z, c], i) => <Banner key={i} p={[x, 0, z]} color={c} />)}
+    {[[-8.5, 50, '#c0504d'], [8.5, 48, '#4a7fb0'], [-8.5, -104, '#e0a83c'], [8.5, -116, '#c0504d']].map(([x, z, c], i) => <Banner key={i} p={[x, 0, z]} color={c} />)}
     <Fountain />
   </>);
 }
