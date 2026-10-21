@@ -9,6 +9,8 @@ import { Ground } from './Ground';
 import { Player, useInteract } from './Player';
 import { playerPos, useStory, pipSay, card } from './state';
 import { chime, pop } from './audio';
+import { Town, Dress } from './Town';
+import { Chest, Debris, Pyramid, Barrel, Lamps } from './Props';
 
 // Five beats along one long street (z runs from +52 at the start to -68 at the Clock):
 // 1 toll street · 2 under-archive · 3 ghost payroll rooftops · 4 counting house · 5 the square.
@@ -31,7 +33,9 @@ function Gate({ i, x }) {
     const g = [...S.gates]; g[i] = true; S.progress({ gates: g }); S.addTrust(5); pop(); pipSay('🪙✋', 'Pip: that toll is stopped.', 2200);
   };
   return (<>
-    {!open && <Box p={[x, .7, 36]} s={[4, 1.4, .4]} c="#c0504d" />}
+    {!open && <Box p={[x, 1, 36]} s={[4, 2, .4]} c="#c0504d" />}
+    <Chest i={i} x={x * 1.7} />
+    {open && <Debris x={x} />}
     <RigidBody type="fixed" colliders={false} position={[x, .8, 37.2]}>
       <CuboidCollider args={[1.8, .8, .7]} sensor onIntersectionEnter={e => e.other.rigidBodyObject?.name === 'cart' && jam()} />
     </RigidBody>
@@ -160,7 +164,8 @@ function Pip() {
 }
 
 export function Ashmarket() {
-  const lite = useStory(s => s.lite), solved = useStory(s => s.solved);
+  const lite = useStory(s => s.lite), solved = useStory(s => s.solved), root = useRef();
+  useEffect(() => { root.current && root.current.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } }); }, []);
   useEffect(() => { card('I · Ashmarket', 3000); }, []);
   const interact = useCallback(() => {
     const S = useStory.getState(); if (S.ended) return;
@@ -192,8 +197,11 @@ export function Ashmarket() {
     if (pr !== S.prompt) useStory.setState({ prompt: pr });
   });
   return (
-    <group>
+    <group ref={root}>
       <group position={[0, 0, -7]}><Ground w={44} h={130} /></group>
+      <Town /><Lamps />
+      <Pyramid x={-15} z={44} /><Pyramid x={15} z={33} /><Pyramid x={11} z={-34} />
+      {[[-16, .5, 30], [-15, .5, 31.2], [16, .5, 46], [13, .5, 15], [-12, .5, -3], [-12, .5, -50], [14, .5, -44], [5, .5, -50]].map((p, i) => <Barrel key={i} p={p} />)}
       <RigidBody type="fixed"><CuboidCollider args={[22, .5, 65]} position={[0, -.5, -7]} /></RigidBody>
       <RigidBody type="fixed" colliders={false}>
         <CuboidCollider args={[22, 3, .5]} position={[0, 3, 57]} /><CuboidCollider args={[22, 3, .5]} position={[0, 3, -71]} />
@@ -220,6 +228,7 @@ export function Ashmarket() {
       <Box p={[0, 1.5, -.5]} s={[5, 3, 5]} c="#c9b79a" /><Box p={[0, 1.75, -8]} s={[5, 3.5, 5]} c="#b9a58c" />
       <Box p={[7, 2, -14]} s={[5, 4, 5]} c="#c9b79a" /><Box p={[7, 2.25, -22]} s={[5, 4.5, 5]} c="#b9a58c" />
       <HatWall />
+      <Dress p={[0, 1.5, -.5]} s={[5, 3, 5]} k={0} /><Dress p={[0, 1.75, -8]} s={[5, 3.5, 5]} k={1} /><Dress p={[7, 2, -14]} s={[5, 4, 5]} k={2} /><Dress p={[7, 2.25, -22]} s={[5, 4.5, 5]} k={3} />
 
       {/* beat 4: counting house */}
       <Box p={[-7.25, 1.25, -30]} s={[10.5, 2.5, .6]} c="#8a7a6a" /><Box p={[7.25, 1.25, -30]} s={[10.5, 2.5, .6]} c="#8a7a6a" />

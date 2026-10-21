@@ -15,7 +15,14 @@ void main(){
   float heal = smoothstep(r-.08, r+.08, uTrust*1.25);
   vec3 rot = mix(vec3(.30,.31,.30), vec3(.12,.12,.15), n(vXZ*3.+uTime*.05)*.6);
   vec3 grass = mix(vec3(.45,.74,.36), vec3(.58,.82,.42), n(vXZ*2.));
-  csm_DiffuseColor = vec4(mix(rot, grass, heal), 1.);
+  vec3 base = mix(rot, grass, heal);
+  vec2 q = vXZ, cell = vec2(q.x*.9 + floor(q.y*.9)*.5, q.y*.9), f = fract(cell);
+  float mortar = 1. - step(.07,f.x)*step(.07,f.y);
+  vec3 stone = mix(vec3(.55,.52,.47), vec3(.70,.66,.60), h(floor(cell)));
+  stone = mix(stone, vec3(.16,.15,.15), mortar);
+  stone = mix(stone*.5, stone, heal);
+  float street = smoothstep(8.6, 7.6, abs(q.x));
+  csm_DiffuseColor = vec4(mix(base, stone, street), 1.);
 }`;
 export function Ground({ w = 40, h = 40 }) {
   const m = useRef();
