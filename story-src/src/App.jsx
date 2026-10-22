@@ -14,6 +14,7 @@ const KEYS = [
   { name: 'forward', keys: ['KeyW', 'ArrowUp'] }, { name: 'back', keys: ['KeyS', 'ArrowDown'] },
   { name: 'left', keys: ['KeyA', 'ArrowLeft'] }, { name: 'right', keys: ['KeyD', 'ArrowRight'] },
   { name: 'jump', keys: ['Space'] }, { name: 'interact', keys: ['KeyE'] },
+  { name: 'sprint', keys: ['ShiftLeft', 'ShiftRight'] }, { name: 'camL', keys: ['KeyQ'] }, { name: 'camR', keys: ['KeyR'] },
 ];
 const WARM = new THREE.Color('#fff1cf'), DIM = new THREE.Color('#b8bcbf'), LDIR = new THREE.Vector3(.55, .7, .15).normalize();
 function Atmosphere() {

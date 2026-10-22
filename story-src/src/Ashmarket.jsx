@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
-import { useFrame } from '@react-three/fiber';
+import { useFrame, useThree } from '@react-three/fiber';
 import { RigidBody, CuboidCollider, CylinderCollider } from '@react-three/rapier';
 import { Float, Sparkles, ContactShadows, Html } from '@react-three/drei';
 import * as THREE from 'three';
@@ -9,6 +9,7 @@ import { Ground } from './Ground';
 import { Player, useInteract } from './Player';
 import { playerPos, useStory, pipSay, card } from './state';
 import { chime, pop } from './audio';
+import { objective } from './quest';
 import { Town, Dress } from './Town';
 import { Chest, Debris, Pyramid, Barrel, Lamps } from './Props';
 import { Terrain } from './Terrain';
@@ -26,11 +27,20 @@ const near = (x, z, r) => Math.hypot(playerPos.x - x, playerPos.z - z) < r;
 const Box = ({ p, s, c = '#8b7e70' }) => (
   <RigidBody type="fixed" position={p} colliders="cuboid"><mesh><boxGeometry args={s} /><meshStandardMaterial color={c} roughness={.9} /></mesh></RigidBody>
 );
-const Crate = ({ p, name }) => (
-  <RigidBody name={name} position={p} colliders="cuboid" friction={.8} linearDamping={2.5} angularDamping={4} enabledRotations={[false, true, false]}>
-    <mesh><boxGeometry args={name === 'cart' ? [1.6, .8, 1.1] : [1, 1, 1]} /><meshStandardMaterial color={name === 'cart' ? '#a87a4a' : '#b8905a'} roughness={.8} /></mesh>
-  </RigidBody>
-);
+function Crate({ p, name }) {
+  const r = useRef(), cart = name === 'cart';
+  const tip = useStory(s => (cart ? s.stage === 0 : s.stage === 1 && s.got[0] && !s.got[1]));
+  useFrame(() => {                                     // anything that falls in the lake returns to where it started
+    const b = r.current; if (!b || b.translation().y > -1.5) return;
+    b.setTranslation({ x: p[0], y: p[1], z: p[2] }, true); b.setLinvel({ x: 0, y: 0, z: 0 }, true); b.setAngvel({ x: 0, y: 0, z: 0 }, true);
+  });
+  return (
+    <RigidBody ref={r} name={name} position={p} colliders="cuboid" friction={.8} linearDamping={2.5} angularDamping={4} enabledRotations={[false, true, false]}>
+      <mesh><boxGeometry args={cart ? [1.6, .8, 1.1] : [1, 1, 1]} /><meshStandardMaterial color={cart ? '#a87a4a' : '#b8905a'} roughness={.8} /></mesh>
+      {tip && <Bubble y={1.4} icons={cart ? '🛒➡️🚧' : '📦➡️⬆️'} />}
+    </RigidBody>
+  );
+}
 function Gate({ i, x }) {
   const open = useStory(s => s.gates[i]);
   const jam = () => {
@@ -39,6 +49,7 @@ function Gate({ i, x }) {
   };
   return (<>
     {!open && <Box p={[x, 1, 38]} s={[4, 2, .4]} c="#c0504d" />}
+    {!open && <Ring p={[x, .06, 39.4]} />}
     <Chest i={i} x={x * 2.1} />
     {open && <Debris x={x} />}
     <RigidBody type="fixed" colliders={false} position={[x, .8, 39.2]}>
@@ -138,19 +149,11 @@ function Crowd() {
   }));
   return spec.map((s, i) => <mesh key={i} ref={el => (refs.current[i] = el)} position={[0, .5, -98]} visible={false}><capsuleGeometry args={[.3, .5, 6, 10]} /><meshStandardMaterial color={s.c} /></mesh>);
 }
-function hint(S) {
-  if (S.ended) return null;
-  if (S.stage === 0) return S.gates[0] ? [5, 44] : [-5, 44];
-  if (S.stage === 1) return !S.got[0] ? [-11, 21.5] : [-10, 11];
-  if (S.stage === 2) return [7, -36];
-  if (S.stage === 3) return [0, -70];
-  return S.stamp ? null : [-6, -106];
-}
 // Pip follows you; after 20s without progress he hops toward the next objective, after 45s sparkles mark it.
 function Pip() {
   const g = useRef(), sp = useRef(), lastHint = useRef(0);
   useFrame(({ clock }, dt) => {
-    const S = useStory.getState(), idle = (performance.now() - S.last) / 1000, h = idle > 20 ? hint(S) : null, t = clock.elapsedTime;
+    const S = useStory.getState(), idle = (performance.now() - S.last) / 1000, ob = objective(S), h = idle > 12 && ob ? ob.p : null, t = clock.elapsedTime;
     let tx = playerPos.x - 1.6, tz = playerPos.z + 1.2;
     if (h) {
       const dx = h[0] - playerPos.x, dz = h[1] - playerPos.z, l = Math.hypot(dx, dz) || 1;
@@ -168,6 +171,32 @@ function Pip() {
   </>);
 }
 
+function Ring({ p }) {
+  const m = useRef();
+  useFrame(({ clock }) => { if (m.current) m.current.scale.setScalar(1 + Math.sin(clock.elapsedTime * 3) * .08); });
+  return <mesh ref={m} position={p} rotation={[-Math.PI / 2, 0, 0]}><ringGeometry args={[1.2, 1.6, 32]} /><meshBasicMaterial color="#8fe08a" transparent opacity={.8} depthWrite={false} /></mesh>;
+}
+// Always-on objective guide: a light pillar at the goal, plus an arrow with distance at the screen edge when it is out of view.
+function Guide() {
+  const g = useRef(), { camera, size } = useThree(), v = useMemo(() => new THREE.Vector3(), []);
+  useFrame(({ clock }) => {
+    const o = objective(useStory.getState()), el = document.getElementById('arrow');
+    if (!o) { g.current.visible = false; if (el) el.style.display = 'none'; return; }
+    const d = Math.hypot(playerPos.x - o.p[0], playerPos.z - o.p[1]);
+    g.current.visible = d > 5; g.current.position.set(o.p[0], 0, o.p[1]); g.current.scale.y = 1 + Math.sin(clock.elapsedTime * 3) * .05;
+    if (!el) return;
+    v.set(o.p[0], 1.5, o.p[1]).project(camera);
+    const behind = v.z > 1;
+    if (d < 6 || (!behind && Math.abs(v.x) < .9 && Math.abs(v.y) < .85)) { el.style.display = 'none'; return; }
+    let x = behind ? -v.x : v.x, y = behind ? -v.y : v.y; const m = Math.max(Math.abs(x), Math.abs(y)) || 1; x = x / m * .88; y = y / m * .8;
+    el.style.display = 'grid'; el.style.left = (x * .5 + .5) * size.width + 'px'; el.style.top = (-y * .5 + .5) * size.height + 'px'; el.style.transform = 'translate(-50%,-50%)';
+    el.children[0].style.transform = `rotate(${Math.atan2(x, y)}rad)`; el.children[1].textContent = Math.round(d) + ' m';
+  });
+  return (<group ref={g}>
+    <mesh position={[0, 6, 0]}><cylinderGeometry args={[.5, .5, 12, 16, 1, true]} /><meshBasicMaterial color="#ffd36e" transparent opacity={.35} depthWrite={false} blending={THREE.AdditiveBlending} side={THREE.DoubleSide} fog={false} /></mesh>
+    <mesh position={[0, .08, 0]} rotation={[-Math.PI / 2, 0, 0]}><ringGeometry args={[1.1, 1.5, 32]} /><meshBasicMaterial color="#ffd36e" transparent opacity={.8} depthWrite={false} /></mesh>
+  </group>);
+}
 export function Ashmarket() {
   const lite = useStory(s => s.lite), solved = useStory(s => s.solved), root = useRef();
   useEffect(() => { root.current && root.current.traverse(o => { if (o.isMesh && !o.userData.noShadow) { o.castShadow = true; o.receiveShadow = true; } }); }, []);
@@ -198,7 +227,7 @@ export function Ashmarket() {
     if (st !== S.stage) S.progress({ stage: st });
     const slotNear = S.stage >= 3 && !S.solved && SLOT_X.some(x => near(x, SLOT_Z, 2));
     const stampNear = S.stage === 4 && !S.stamp && STAMPS.some(([x, z]) => near(x, z, 1.8));
-    const pr = slotNear || stampNear ? 'E' : '';
+    const pr = slotNear ? 'E · 📜' : stampNear ? 'E · 🧾' : '';
     if (pr !== S.prompt) useStory.setState({ prompt: pr });
   });
   return (
@@ -256,6 +285,7 @@ export function Ashmarket() {
 
       {PAGES.map((p, i) => <Page key={i} id={i} p={p} />)}
       <Sparkles count={120} scale={[70, 10, 260]} position={[0, 4, -35]} size={2} speed={.3} color="#aab0b4" />
+      <Guide />
       <Pip />
       <Player />
     </group>
