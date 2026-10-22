@@ -9,7 +9,7 @@ export function Buddy({ type = 'slime' }) {
   const K = KINDS[type] || KINDS.slime, blush = K.blush || '#ff9ec0';
   const eyes = (y, z, sp, cx, cy, cz) => [-1, 1].map(s => (
     <group key={s}>
-      <mesh position={[s * sp, y, z]}><sphereGeometry args={[.075, 16, 12]} />
+      <mesh position={[s * sp, y, z]} userData={{ eye: 1 }}><sphereGeometry args={[.075, 16, 12]} />
         {K.glow ? <meshStandardMaterial color={K.glow} emissive={K.glow} emissiveIntensity={1.2} /> : dark}</mesh>
       <mesh position={[s * cx, cy, cz]} scale={[1, 1, .4]}><sphereGeometry args={[.09, 12, 10]} /><meshStandardMaterial color={blush} roughness={.9} /></mesh>
     </group>

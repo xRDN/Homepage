@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
-import { useStory } from './state';
+import { useStory, vis } from './state';
 
 export const SUN = new THREE.Vector3(.25, .36, -.9).normalize();
 const ZEN0 = new THREE.Color('#6f767c'), ZEN1 = new THREE.Color('#3f86d6'), HOR0 = new THREE.Color('#9aa0a4'), HOR1 = new THREE.Color('#bfe0f5');
@@ -31,7 +31,7 @@ export function Sky() {
   const sun = useRef();
   useEffect(() => { useStory.setState({ sunMesh: sun.current }); return () => useStory.setState({ sunMesh: null }); }, []);
   useFrame(({ camera, clock }) => {
-    const t = useStory.getState().trust / 100, c = skyColors(t);
+    const t = vis.trust, c = skyColors(t);
     g.current.position.copy(camera.position);
     u.uZen.value.copy(c.zen); u.uHor.value.copy(c.hor); u.uTime.value = clock.elapsedTime; u.uTrust.value = t;
     sun.current.scale.setScalar(.2 + t);

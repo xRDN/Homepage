@@ -32,3 +32,17 @@ canvas{display:block}
 .legend{position:absolute;left:50%;bottom:1rem;transform:translateX(-50%);background:rgba(20,30,25,.7);color:#fff;font-size:.75rem;font-weight:700;padding:.4rem .9rem;border-radius:99px;pointer-events:none;animation:fade 14s both}
 #arrow{position:absolute;pointer-events:none;display:grid;justify-items:center}
 #arrow b{font-size:2rem;color:#ffd36e;text-shadow:0 2px 6px rgba(0,0,0,.6);display:block}#arrow small{font-weight:800;color:#fff;text-shadow:0 1px 4px rgba(0,0,0,.7)}
+.narr{position:absolute;left:50%;top:1.2rem;transform:translateX(-50%);width:min(88vw,34rem);text-align:center;pointer-events:none}
+.narr p{font-size:1.15rem;font-weight:700;line-height:1.4;background:rgba(251,247,238,.92);border:3px solid #fff;border-radius:22px;padding:.7rem 1.1rem;box-shadow:0 5px 0 rgba(60,110,90,.28);animation:pop .5s both}
+.narr small{display:inline-block;margin-top:.5rem;font-weight:800;background:#ffe9a8;border-radius:99px;padding:.25rem .8rem}
+.nav{position:absolute;left:50%;bottom:max(1.2rem,env(safe-area-inset-bottom));transform:translateX(-50%);display:flex;align-items:center;gap:1rem}
+.nav .btn{padding:.7rem 1.4rem}.nav .btn:disabled{opacity:.35;cursor:default}.nav .btn.go{animation:pulse 1.2s infinite alternate}
+.dots{display:flex;gap:.35rem}.dots i{width:.55rem;height:.55rem;border-radius:50%;background:rgba(255,255,255,.55)}
+.dots i.pro{background:rgba(255,255,255,.85)}.dots i.done{background:#8fe08a}.dots i.cur{background:#ffd36e;transform:scale(1.5)}
+.askdot{position:absolute;left:50%;top:1.4rem;transform:translateX(-50%);font-size:1.6rem;animation:bob 1s infinite alternate}
+.bignum{font-size:3.6rem;font-weight:900;color:#3a2a20;background:#fff4d8;border-radius:20px;padding:.1rem 1rem;box-shadow:0 4px 0 rgba(60,40,20,.3)}
+.pips{background:#fff;border-radius:14px;padding:.15rem .5rem;font-weight:800;letter-spacing:.08em;box-shadow:0 3px 0 rgba(60,110,90,.3);white-space:nowrap}
+.pips.bad{background:#ffd9d2}.pips.ok{background:#dbeccf}
+.tap{animation:bob 1s infinite alternate}
+@keyframes bob{to{transform:translateY(-8px)}}
+@keyframes pulse{to{transform:scale(1.06)}}
