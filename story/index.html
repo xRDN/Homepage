@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>The Long Spring · a film</title>
+<link rel="stylesheet" href="film.css">
+</head>
+<body>
+<main id="stage">
+  <canvas id="c" aria-label="The Long Spring, an animated film"></canvas>
+  <p id="cap" role="status" aria-live="polite"></p>
+  <input id="inp" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="80" aria-label="Write here">
+  <button id="skip">continue ›</button>
+</main>
+
+<section id="title">
+  <h1>The Long Spring</h1>
+  <p>An animated film · sixteen scenes · about 16 minutes · best with sound</p>
+  <button id="watch">Watch</button>
+  <label><input type="checkbox" id="noint"> Watch without interaction</label>
+  <a href="../">← back to the island</a>
+  <small>Animatic with placeholder art. Space or a click takes part in the quiet moments.</small>
+</section>
+
+<nav id="bar" aria-label="Player controls">
+  <button id="pp" aria-label="Pause">❚❚</button>
+  <div id="chap" role="group" aria-label="Scenes"></div>
+  <span id="time">0:00</span>
+  <button id="cc" aria-pressed="true" title="Captions (C)">CC</button>
+  <button id="it" aria-pressed="true" title="Interaction on or off">Interact</button>
+  <button id="mu" aria-pressed="false" title="Mute (M)">Sound</button>
+  <button id="fs" title="Fullscreen (F)">⛶</button>
+</nav>
+
+<section id="end" hidden>
+  <h2>The Long Spring</h2>
+  <p id="endline"></p>
+  <button id="again">Watch again</button>
+  <a href="../">Back to the island</a>
+</section>
+<script type="module" src="film.js"></script>
+</body>
+</html>
