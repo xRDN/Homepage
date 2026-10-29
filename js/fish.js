@@ -17,7 +17,13 @@ export const SPECIES = [
 ];
 const rand = (a, b) => a + Math.random() * (b - a);
 const pickSp = r => { const l = SPECIES.filter(s => s.r === r); return l[Math.floor(Math.random() * l.length)]; };
-const roll = () => { let x = Math.random() * 100; for (const k of ['N', 'R', 'SR', 'SSR']) if ((x -= RAR[k].w) < 0) return pickSp(k); return pickSp('N'); };
+// Base odds are 60 / 28 / 10 / 2. Luck (rain, night, aurora) shifts weight from Common towards the rarer tiers.
+const roll = (luck = 1) => {
+  const w = { N: RAR.N.w, R: RAR.R.w * luck, SR: RAR.SR.w * luck, SSR: RAR.SSR.w * luck * luck };
+  let x = Math.random() * (w.N + w.R + w.SR + w.SSR);
+  for (const k of ['N', 'R', 'SR', 'SSR']) if ((x -= w[k]) < 0) return pickSp(k);
+  return pickSp('N');
+};
 
 export function buildFish(sp) {
   const g = new THREE.Group();
@@ -45,18 +51,20 @@ export function createFishing({ scene, pond, toast, sound }) {
   const bob = new THREE.Mesh(new THREE.SphereGeometry(.13, 12, 10), new THREE.MeshStandardMaterial({ color: 0xe8554e }));
   bob.visible = false; scene.add(bob);
   let st = 'idle', timer = 0, leap = null;
+  const cond = { bite: 1, luck: 1, swim: 1, blocked: '' }; // set every frame by the weather
   const idle = () => { st = 'idle'; bob.visible = false; };
   return {
-    dex, active: () => st !== 'idle', cancel: idle,
-    label: () => st === 'bite' ? '❗ Reel in!' : st === 'wait' ? '🎣 Waiting…' : '🎣 Cast line',
+    dex, active: () => st !== 'idle', cancel: idle, setCond: c => Object.assign(cond, c),
+    label: () => cond.blocked ? '🚫 ' + cond.blocked : st === 'bite' ? '❗ Reel in!' : st === 'wait' ? '🎣 Waiting…' : '🎣 Cast line',
     press() {
+      if (cond.blocked && st === 'idle') return toast(cond.blocked, '#8fa39a');
       if (st === 'idle') {
         const a = rand(0, 6.28), r = rand(.5, 1.8);
         bob.position.set(pond.x + Math.cos(a) * r, .1, pond.z + Math.sin(a) * r); bob.visible = true;
-        st = 'wait'; timer = rand(1.5, 4.5); sound.splash();
+        st = 'wait'; timer = rand(1.5, 4.5) / Math.max(cond.bite, .2); sound.splash();
       } else if (st === 'wait') { idle(); toast('Too early, it swam off 🐟', '#8fa39a'); }
       else {
-        const sp = roll(); dex[sp.id] = (dex[sp.id] || 0) + 1; localStorage.setItem('island.dex', JSON.stringify(dex));
+        const sp = roll(cond.luck); dex[sp.id] = (dex[sp.id] || 0) + 1; localStorage.setItem('island.dex', JSON.stringify(dex));
         const f = buildFish(sp); f.position.copy(bob.position); scene.add(f);
         leap = { f, t: 0, from: bob.position.clone() }; idle(); sound.splash();
         const R = RAR[sp.r];
@@ -66,7 +74,7 @@ export function createFishing({ scene, pond, toast, sound }) {
     },
     update(dt, t) {
       swimmers.forEach(f => {
-        const u = f.userData; u.a -= u.v * dt / u.r;
+        const u = f.userData; u.a -= u.v * cond.swim * dt / u.r;
         f.position.set(pond.x + Math.cos(u.a) * u.r, .09 + Math.sin(t * 3 + u.r) * .01, pond.z + Math.sin(u.a) * u.r);
         f.rotation.y = Math.PI / 2 - u.a;
       });
@@ -84,7 +92,7 @@ export function createFishing({ scene, pond, toast, sound }) {
 
 export function renderDex(el, dex) {
   const got = SPECIES.filter(s => dex[s.id]).length;
-  el.innerHTML = `<p class="dexn">${got}/${SPECIES.length} discovered · odds: N 60% · R 28% · SR 10% · SSR 2%</p>` + SPECIES.map(s => dex[s.id]
+  el.innerHTML = `<p class="dexn">${got}/${SPECIES.length} discovered · base odds: N 60% · R 28% · SR 10% · SSR 2% · rain, night and auroras improve your luck</p>` + SPECIES.map(s => dex[s.id]
     ? `<div class="fc" style="--rc:${RAR[s.r].c}"><b>${s.e}</b>${s.n}<br><small>${s.r} · ${RAR[s.r].name}</small><br>×${dex[s.id]}</div>`
     : `<div class="fc no" style="--rc:${RAR[s.r].c}"><b>❔</b>???<br><small>${s.r}</small></div>`).join('');
 }
