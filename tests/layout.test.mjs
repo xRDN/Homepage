@@ -1,6 +1,6 @@
 import { createLayout } from '../js/layout.js';
 let bad = 0, t0 = performance.now(), stat = {};
-const solids = o => [...o.props.filter(p => p.r > 0).map(p => ({ x: p.x, z: p.z, r: p.r * (p.k === 'tree' ? p.s : 1), k: p.k })), ...o.stations.map(s => ({ x: s.x, z: s.z, r: 1.4, k: 'st' }))];
+const solids = o => [...o.props.filter(p => p.r > 0).map(p => ({ x: p.x, z: p.z, r: p.r * (p.k === 'tree' ? p.s : 1), k: p.k })), ...o.stations.flatMap(s => [-2.6, -1.56, -.52, .52, 1.56, 2.6].map(dx => ({ x: s.x + dx, z: s.z, r: .55, k: 'st' })))];
 for (let seed = 1; seed <= 400; seed++) for (const [l, p] of [[3, 3], [1, 1], [6, 7]]) {
   const o = createLayout({ seed, links: l, projects: p });
   const a = JSON.stringify(createLayout({ seed, links: l, projects: p }));
@@ -10,12 +10,13 @@ for (let seed = 1; seed <= 400; seed++) for (const [l, p] of [[3, 3], [1, 1], [6
     if (Math.hypot(S[i].x, S[i].z) > 12.9) { bad++; console.log('rim', seed, l, p, S[i]); }
     for (let j = i + 1; j < S.length; j++) {
       const d = Math.hypot(S[i].x - S[j].x, S[i].z - S[j].z);
-      if (!(S[i].k==='st'&&S[j].k==='st'&&p>3) && d < S[i].r + S[j].r - 0.05) { bad++; if (bad < 15) console.log('overlap', seed, l, p, S[i].k, S[j].k, d.toFixed(2)); }
+      if (!(S[i].k==='st'&&S[j].k==='st') && d < S[i].r + S[j].r - 0.05) { bad++; if (bad < 15) console.log('overlap', seed, l, p, S[i].k, S[j].k, d.toFixed(2)); }
     }
     // not on spawn, not in pond
     if (Math.hypot(S[i].x, S[i].z) < 1.2) { bad++; console.log('spawn', seed, S[i]); }
     if (Math.hypot(S[i].x - o.pond.x, S[i].z - o.pond.z) < o.pond.r) { bad++; console.log('pond', seed, S[i]); }
   }
+  if (o.stations.length !== 1 || Math.abs(o.stations[0].z + 4.9) > .01) { bad++; console.log('board', seed); }
   if (o.shelters.length < 2) { bad++; console.log('shelters', seed, l, p, o.shelters.length); }
   if (l == 3 && p == 3) for (const k of ['tree', 'rock', 'bush', 'flower', 'mushroom', 'lamp', 'bench', 'windmill', 'fence', 'campfire']) { stat[k] = (stat[k] || 0) + o.props.filter(x => x.k === k).length; }
 }

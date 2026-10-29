@@ -1,6 +1,6 @@
 // Procedural ambience: nothing to download, everything is synthesized live.
 // sound.set(night, cold, wx) picks the music scale and the critters; sound.env({...}) follows the blended weather numbers.
-let ctx, master, amb, windG, windF, rainG, snowG, on = true, mood = { night: false, cold: false, wx: 'clear' }, envv = { rain: 0, snow: 0, wind: .15, shelter: 0, heat: 0 };
+let ctx, master, amb, windG, windF, rainG, snowG, horG, droneF, hv = 0, on = true, mood = { night: false, cold: false, wx: 'clear' }, envv = { rain: 0, snow: 0, wind: .15, shelter: 0, heat: 0 };
 const noise = (brown, sec = 2, loop = true) => {
   const b = ctx.createBuffer(1, ctx.sampleRate * sec, ctx.sampleRate), d = b.getChannelData(0);
   let l = 0;
@@ -26,15 +26,21 @@ export const sound = {
     rainG = ctx.createGain(); rainG.gain.value = 0; noise(false).connect(hp).connect(rainG).connect(amb);
     const sf = ctx.createBiquadFilter(); sf.type = 'bandpass'; sf.frequency.value = 2600; sf.Q.value = .4;
     snowG = ctx.createGain(); snowG.gain.value = 0; noise(false).connect(sf).connect(snowG).connect(amb);
+    // haunted-island drone: three detuned low saws through a slowly wandering low-pass (silent until horror mode is on)
+    horG = ctx.createGain(); horG.gain.value = 0; droneF = ctx.createBiquadFilter(); droneF.type = 'lowpass'; droneF.frequency.value = 160; droneF.connect(horG).connect(master);
+    for (const f of [48.9, 51.3, 97.4]) { const o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.value = f; const g = ctx.createGain(); g.gain.value = f > 90 ? .35 : 1; o.connect(g).connect(droneF); o.start(); }
+    setInterval(() => droneF.frequency.setTargetAtTime(110 + Math.random() * 170, ctx.currentTime, 2.5), 3500);
     sound.set(mood.night, mood.cold, mood.wx);
     const SC = { dw: [262, 294, 330, 392, 440, 523], dc: [392, 440, 523, 587, 659, 784], nw: [196, 233, 262, 311, 349, 392], nc: [523, 622, 698, 784, 932, 1047] };
     setInterval(() => { // generative pentatonic, scale follows the world mood; stormy weather thins it out
       if (Math.random() > .6 - envv.rain * .25) return;
+      if (hv > .5) { const f = 70 + Math.random() * 90; blip(f, 3, .02 * hv, f * (Math.random() < .5 ? 1 : 1.06), 'triangle'); return; } // haunted: low, slightly off-key
       const sc = SC[(mood.night ? 'n' : 'd') + (mood.cold ? 'c' : 'w')], f = sc[Math.floor(Math.random() * sc.length)];
       blip(f, 1.6, .025 * (1 - envv.rain * .5)); if (Math.random() < .4) blip(f * 1.5, 1.2, .012, f * 1.5, 'sine', .25);
     }, 1700);
     setInterval(() => { // critters: only when the weather lets them out
       const { night, cold, wx } = mood;
+      if (hv > .3) return; // no birds, no crickets: it is too quiet
       if (cold || envv.rain > .15 || envv.wind > .7 || wx === 'fog') return;
       if (envv.heat > .5 && !night) { if (Math.random() < .5) for (let i = 0; i < 7; i++) blip(5200, .03, .008, 5200, 'sine', i * .035); } // cicadas
       else if (night) for (let i = 0; i < 3; i++) blip(4300, .035, .012, 4300, 'sine', i * .07);             // crickets
@@ -58,6 +64,9 @@ export const sound = {
     g.gain.setValueAtTime(0, T); g.gain.linearRampToValueAtTime(.9 * power * (1 - envv.shelter * .35), T + .08); g.gain.exponentialRampToValueAtTime(.001, T + 2.8);
     s.connect(f).connect(g).connect(master); s.stop(T + 3);
   },
+  horror(v) { hv = v; if (horG) horG.gain.setTargetAtTime(v * .06, ctx.currentTime, 1.2); },
+  creak() { blip(120, 1.2, .05, 62, 'sawtooth'); blip(2300, .06, .008, 1700, 'square', .05); },
+  heartbeat(p = .5) { blip(62, .13, .07 + p * .1, 38, 'sine'); blip(54, .15, .05 + p * .08, 34, 'sine', .2); },
   splash: () => blip(260, .25, .05, 70, 'triangle'),
   step: (soft, wet) => wet ? blip(520, .07, .03, 190, 'triangle') : blip(soft ? 220 : 150, .05, soft ? .02 : .05, 60, 'triangle'),
   jump: () => blip(300, .15, .05, 650),

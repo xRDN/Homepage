@@ -138,6 +138,29 @@ export function leanto() {
   mk(box(.9, .14, .3), MATS.wood, [.3, .22, -.55], g);
   return g;
 }
+// The signboard: two posts, a wooden board with the painted face texture, a little gabled roof (whitens under snow)
+// and a lantern at each end that glows with the other lamps and swings in the wind. Faces +z; origin on the ground.
+export function signboard(map) {
+  const g = new THREE.Group();
+  mk(box(5.9, .16, .95), MATS.stone, [0, .08, 0], g);
+  for (const s of [-1, 1]) mk(cyl(.12, .14, 4.05, 10), MATS.wood2, [s * 2.62, 2.02, 0], g);
+  mk(box(5.1, 3.0, .18), MATS.wood, [0, 2.22, 0], g);
+  mk(box(5.4, .16, .3), MATS.wood2, [0, 3.76, .02], g); mk(box(5.4, .16, .3), MATS.wood2, [0, .7, .02], g);
+  const face = new THREE.MeshStandardMaterial({ map, roughness: .85, emissiveMap: map, emissive: 0xffffff, emissiveIntensity: .1 });
+  const f = mk(new THREE.PlaneGeometry(4.9, 2.8), face, [0, 2.22, .095], g, false);
+  for (const s of [1, -1]) { const r = mk(box(6.1, .1, 1.15), MATS.roof, [0, 4.14, s * .5], g); r.rotation.x = s * .5; }
+  mk(box(6.1, .1, .16), MATS.roof2, [0, 4.4, 0], g);
+  const lanterns = [-1, 1].map(s => {
+    mk(box(.08, .08, .8), MATS.metal, [s * 2.62, 3.55, .45], g);
+    const pv = new THREE.Group(); pv.position.set(s * 2.62, 3.55, .82); g.add(pv);
+    mk(cyl(.012, .012, .3, 4), MATS.metal, [0, -.15, 0], pv, false);
+    mk(new THREE.ConeGeometry(.17, .14, 8), MATS.metal, [0, -.3, 0], pv, false);
+    mk(sph(.14, 12, 10), MATS.lamp, [0, -.44, 0], pv, false);
+    return pv;
+  });
+  g.userData.lanterns = lanterns; g.userData.face = face; g.userData.faceMesh = f;
+  return g;
+}
 export function puddle(s) {
   const g = new THREE.Group();
   const p = mk(new THREE.CircleGeometry(1, 20), MATS.puddle, [0, .02, 0], g, false); p.rotation.x = -Math.PI / 2; p.scale.set(s, s * .8, 1);

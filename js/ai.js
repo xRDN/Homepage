@@ -8,6 +8,12 @@ const tok = s => (s.toLowerCase().match(/[a-z0-9+#.]+/g) || []).filter(w => !STO
 const pick = a => a[Math.floor(Math.random() * a.length)];
 const lazy = t => { const x = t.split(' ').map(w => /^https?:/.test(w) ? w : w.toLowerCase()).join(' ').replace(/[.!]+$/, ''); return x + (/https?:\S*$/.test(x) ? ' ' : '') + pick(['~', '...', '~ zzz']); };
 
+// What they say once the island is haunted (Pip is frightened and brave about it; Momo is flatly unsettled)
+export const HORROR_LINES = {
+  pip: ['Shh… did you hear that? 🐰', "I don't like how the lamps flicker.", 'Please stay close to me.', 'Something is standing at the edge of the fog.', "Don't look at it for too long.", 'The pond is too still…', 'Everything is watching us.'],
+  momo: ["don't. look. behind. you.", "i heard breathing. it wasn't mine.", 'it has never been this quiet. i hate it.', 'the fog is watching.', 'can we go home now?', "someone is humming. there's nobody here.", 'i can not nap. something keeps standing there.'],
+};
+
 export const BUDDIES = {
   pip:  { name: 'Pip',  type: 'pip',   emoji: '🐰', sys: "You are Pip, a cheerful, precise little bunny-bot who guides visitors around Erdian's island homepage. Reply in at most 2 short upbeat sentences, with the odd bunny pun or emoji." },
   momo: { name: 'Momo', type: 'mochi', emoji: '🍡', sys: "You are Momo, a sleepy, deadpan mochi blob who loves naps, rain and snacks. Reply in lowercase, at most 2 short sentences, with dry humor. You are vague about technical details and send people to Pip for specifics." },
@@ -42,7 +48,7 @@ export function initAI({ know, facts, ctx }) {
     { k: ['shelter', 'hide', 'dry', 'roof', 'gazebo', 'hut', 'cabin', 'campfire', 'fire', 'cover', 'indoors'], pip: [c => `Two shelters: the gazebo${where(c, 'gazebo')} and the lean-to with a campfire by the pond${where(c, 'leanto')}. Under a roof the rain, snow and wind can't touch you.`], momo: [c => `gazebo${where(c, 'gazebo')}. lean-to has a fire${where(c, 'leanto')}. i'll save you a spot~`] },
     { k: ['weather', 'forecast', 'temperature', 'temp', 'outside', 'sunny', 'rain', 'raining', 'snow', 'snowing', 'storm', 'wind', 'windy', 'fog', 'foggy', 'cloudy', 'hot', 'cold', 'umbrella', 'aurora'], pip: [c => weatherSay(c).pip], momo: [c => weatherSay(c).momo] },
     { k: ['fish', 'fishing', 'pond', 'catch', 'rod', 'rare', 'legendary', 'koi', 'cast'], pip: [c => c.frozen ? 'The pond is frozen, so no fishing! Warm things up with the ❄️/🔥 icon in settings.' : c.wx === 'storm' ? "Too stormy to fish. Wait for it to pass, or shelter and listen to the thunder." : `Walk to the pond and press E (or the button) to cast, then again on ❗. ${c.wx === 'rain' ? 'Rain makes fish bite faster and rare ones likelier!' : c.night ? 'Night fishing is a little luckier.' : 'Rain, night and auroras improve your odds.'}`], momo: ['fishing is just napping with a stick.', c => c.frozen ? 'pond is frozen. fish are napping too. respect.' : 'fish are shy. be shy back. they come.'] },
-    { k: ['acorn', 'acorns', 'golden', 'crown', 'secret', 'hidden', 'collect'], pip: [c => `You've found ${c.acorns}/5 golden acorns. They hide beside trees, rocks and along the rim.${c.acorns >= 5 ? ' And that crown looks great on you! 👑' : ''}`], momo: [c => `acorns... i ate one once. not gold though. you have ${c.acorns}.`] },
+    { k: ['acorn', 'acorns', 'golden', 'crown', 'secret', 'hidden', 'collect'], pip: [c => `You've found ${c.acorns}/5 golden acorns. They hide beside trees, rocks and along the rim.${c.acorns >= 5 ? ' You found all five… and ever since, the island has felt different. 🕯️' : ' Find them all and see what happens… 🌰'}`], momo: [c => c.acorns >= 5 ? `i told you not to collect them all. you have ${c.acorns}. look at the sky.` : `acorns... i ate one once. not gold though. you have ${c.acorns}.`] },
     { k: ['help', 'controls', 'move', 'walk', 'play', 'jump', 'stick', 'how to', 'what can i do', 'camera', 'look'], pip: ['Move with WASD or the analog stick on the left half of the screen; drag the right half to look around. E (or the button) interacts, Space jumps, Enter chats. Say @Pip or @Momo to talk to us!'], momo: ['walk with legs. or the stick. i do not make the rules~', 'left side moves you. right side moves the world. nap anywhere.'] },
     { k: ['time', 'night', 'day', 'dark', 'moon', 'stars', 'morning', 'evening'], pip: [c => c.night ? "It's night: lamps glow, fireflies drift and shooting stars appear on clear nights. ✨" : "It's daytime! The lamps are off and the birds are out. 🐦"], momo: [c => c.night ? 'night. finally. my favourite.' : 'day. fine. wake me at sunset.'] },
     { k: ['joke', 'funny', 'laugh'], pip: ["Why did the bunny open a pond? To have a hoppy hour! 🐰", "What do you call a rabbit with fleas? Bugs Bunny!"], momo: ['i would tell a joke but it takes energy.', 'knock knock. ...nobody there. perfect.'] },
@@ -61,6 +67,7 @@ export function initAI({ know, facts, ctx }) {
 
   function quick(who, q) {
     const low = q.toLowerCase(), t = tok(q), c = ctx();
+    if (c.horror && Math.random() < .6) return pick(HORROR_LINES[who]); // haunted: they mostly just whisper about it
     let best, bs = 0;
     for (const e of intents) {
       let s = 0;
@@ -74,7 +81,7 @@ export function initAI({ know, facts, ctx }) {
 
   async function smart(who, q, onTok) {
     const c = ctx(), B = BUDDIES[who];
-    const sys = `${B.sys} Facts you may use: ${facts} Right now on the island: ${c.wxName.toLowerCase()}, ${c.temp}°, ${c.night ? 'night' : 'day'}${c.sheltered ? ', the visitor is sheltered' : ''}. Golden acorns found: ${c.acorns}/5. If you do not know, say so.`;
+    const sys = `${B.sys} Facts you may use: ${facts} Right now on the island: ${c.wxName.toLowerCase()}, ${c.temp}°, ${c.night ? 'night' : 'day'}${c.sheltered ? ', the visitor is sheltered' : ''}. Golden acorns found: ${c.acorns}/5.${c.horror ? ' The island is haunted right now: be unsettled, speak softly and warn the visitor that something is watching from the fog (nothing gory).' : ''} If you do not know, say so.`;
     const msgs = [{ role: 'system', content: sys }, ...hist[who].slice(-6), { role: 'user', content: q }];
     const s = await engine.chat.completions.create({ messages: msgs, stream: true, max_tokens: 110, temperature: .7 });
     let txt = '';

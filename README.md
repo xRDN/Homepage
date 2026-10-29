@@ -3,16 +3,16 @@
 A tiny walkable 3D homepage (Three.js, no build step, no server). Works on GitHub Pages as-is.
 
 - Edit `LINKS`, `PROJECTS`, `NPC_LINES`, `WX_LINES` and the `know` list at the top of `js/main.js`.
-- Each project gets its own pedestal; walk up and press E (or tap the sign) to open its card.
+- One signboard north of the spawn shows your projects and contacts. Walk up and press E (or click / tap the board) to open a card with the project list and your links.
 - Deep links: `#night`, `#day`, `#cold`, `#projects`, and any weather: `#rain`, `#storm`, `#snow`, `#fog`, `#windy`, `#cloudy`, `#heat`, `#clear` (combine, e.g. `#night-storm`). A weather link locks the weather; `#auto` lets it drift.
 
 ## Controls
 
 - **Move:** WASD / arrows, or the **analog stick**: touch (or click-drag) anywhere on the **left half** of the screen and the stick appears under your finger. Push further to run faster.
 - **Look:** drag on the **right half** (or hold the right mouse button anywhere). Mouse wheel zooms.
-- Tapping the ground does nothing any more. A quick tap on a sign opens it, a quick tap on Pip or Momo starts a chat with them.
+- Tapping the ground does nothing any more. A quick tap on the signboard opens it, a quick tap on Pip or Momo starts a chat with them.
 - **E** (or the button that appears) interacts, **Space** jumps, **Enter** opens chat.
-- Only two icon buttons are always on screen: ☰ (links, projects, fish, change buddy, story) and ⚙️ (settings, icons only). Chat opens from 💬 or Enter.
+- Only two icon buttons are always on screen: ☰ (links, projects, fish, change buddy, story) and ⚙️ (settings, icons only). Chat opens from 💬 or Enter and stays open after you send; the 📌 icon in ⚙️ turns that off.
 
 ## Talk to Pip and Momo
 
@@ -22,16 +22,17 @@ Quick mode needs no download. The 🧠 icon in settings loads an optional on-dev
 
 ## The island
 
-- **Placement is calculated, not hand-typed** (`js/layout.js`): signs sit on arcs sized by how many links/projects you have; the pond, gazebo and lean-to are scored for clearance; trees, rocks, bushes, flowers and mushrooms use patterns (rim ring, groves, clusters, rings around the pond, a fairy ring) plus Mitchell's best-candidate sampling, all checked against one occupancy board so nothing overlaps. Same seed, same island: it is cached in `localStorage` and the 🔀 icon re-rolls it.
+- **Placement is calculated, not hand-typed** (`js/layout.js`): the signboard sits north of the plaza with a path to it; the pond, gazebo and lean-to are scored for clearance; trees, rocks, bushes, flowers and mushrooms use patterns (rim ring, groves, clusters, rings around the pond, a fairy ring) plus Mitchell's best-candidate sampling, all checked against one occupancy board so nothing overlaps. Same seed, same island: it is cached in `localStorage` and the 🔀 icon re-rolls it.
 - More things on it: windmill (spins with the wind), lamps (light up at night and in storms), benches, fences, crates, a campfire, stepping-stone paths, lily pads, puddles.
 - **Shelters:** a gazebo and a lean-to with a campfire by the pond. Under a roof rain and snow are cut off, wind can't push you, sound is muffled and the weather chip says 🏠 Sheltered. Pip and Momo run for cover when it gets rough (Momo stays out in light rain to stomp puddles).
 - **Weather (8 kinds)** in ⚙️: clear, cloudy, windy, rain, storm, snow, fog, heatwave. 🎲 lets it drift by itself (on by default), 📍 follows your real local weather. Each one changes: sky, light and fog; clouds (count, speed, darkness); rain streaks, snow, blown leaves; tree sway, flowers closing, windmill speed; wet ground and puddles, snow cover, a freezing pond (no fishing on ice), a drying pond and grass in a heatwave; walking speed and wind gusts; lightning, thunder and camera shake in storms (flash is tiny with reduced motion); lamps and campfire; sound (wind, rain, snow, thunder, cicadas); fishing bite rate and rare-fish odds; an aurora on clear cold nights; a rainbow after rain.
 - Fishing at the pond: N / R / SR / SSR fish (60 / 28 / 10 / 2 % base, better in rain, at night and under an aurora). Ice or a storm blocks fishing.
-- Five golden acorns are hidden around the island; find them all for a crown.
+- Five golden acorns are hidden around the island. Find all five and something wakes up: the island turns haunted (red fog, a lurking figure, nervous buddies, low drone). A 👻 button appears top right to switch it on and off; the choice is remembered. It never jump-scares and has no fast flashing.
+- At night Pip and Momo go to sleep in the lean-to (💤). Talk to them and they wake up; they stay awake when the island is haunted.
 
 ## Meeting other visitors (multiplayer)
 
-Press 🌐 in the ⚙️ panel and everyone online in the same room appears on your island, with their names and chat bubbles.
+You are online by default after "Come on in" and everyone in the same room appears on your island. 🌐 in ⚙️ turns it off (remembered on that device; offline hides everyone). If the server can't be reached it fails quietly and 🌐 stays off.
 
 It runs through a tiny relay server in `worker/` (a Cloudflare Worker + Durable Object, free plan is enough). Every visitor opens a WebSocket to it, so it works across any network, and nobody sees anybody's IP address. The relay keeps only who is where, in memory. It stores nothing and logs no chat.
 
@@ -43,9 +44,9 @@ It runs through a tiny relay server in `worker/` (a Cloudflare Worker + Durable 
 4. Check `https://island-relay.YOUR-NAME.workers.dev/health` says `ok`.
 5. Recommended: in `worker/wrangler.toml` set `ALLOWED_ORIGINS = "https://YOUR-NAME.github.io"` and run `npx wrangler deploy` again, so other websites can't use your relay.
 
-**Meeting a friend:** both open the page, press 🌐, and you're in room `main`. For a private room, share a link like `https://your.site/?room=our-room` (letters, numbers and dashes, up to 24 characters).
+**Rooms hold 7.** Visitors land in `main`; when it has 7 the next visitor goes to `main-2`, then `main-3` and so on. Public rooms carry positions and emoji reactions only, so strangers cannot type to each other. **Meeting a friend with text chat:** share a private link like `https://your.site/?room=our-room` (letters, numbers and dashes, up to 24 characters).
 
-Limits (in `worker/src/room.js`): 40 people per room, about 15 position updates per second and one chat line every 2 seconds per person, 80 characters per line. Chat text is cleaned on the server and shown as plain text in the page.
+Limits (`MAX_PER_ROOM` in `worker/wrangler.toml`, default 7; rate limits in `worker/src/room.js`): about 15 position updates per second and one chat line every 2 seconds per person, 80 characters per line. Chat text is cleaned on the server and shown as plain text in the page.
 
 If `js/config.js` has no address, 🌐 falls back to serverless peer-to-peer (Trystero), which often fails between different networks and shows other visitors your IP address. To test locally: `cd worker && npx wrangler dev`, then in the browser console `localStorage.setItem('island.relay','ws://127.0.0.1:8787')` and reload.
 

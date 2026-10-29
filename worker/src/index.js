@@ -1,7 +1,6 @@
 // Entry point: checks the request, picks the room, hands the WebSocket to that room's Durable Object.
 export { Room } from './room.js';
-
-const roomName = v => String(v || 'main').toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 24) || 'main';
+import { roomName } from './rooms.js';
 
 function originOk(req, env) {
   const allow = String(env.ALLOWED_ORIGINS || '*').split(',').map(s => s.trim()).filter(Boolean);

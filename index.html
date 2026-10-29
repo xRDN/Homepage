@@ -11,15 +11,17 @@
 <body>
 <canvas id="webgl" aria-label="A small 3D island you can walk around"></canvas>
 <div id="labels"></div>
+<div id="vig" aria-hidden="true"></div>
 
 <!-- two icon buttons are all the chrome there is; everything else lives behind them -->
 <div id="mood">
+  <button id="b-horror" class="ico hidden" aria-label="Haunted island">👻</button>
   <button id="b-menu" class="ico hidden" aria-label="Menu" aria-haspopup="true" aria-expanded="false">☰</button>
   <button id="b-gear" class="ico" aria-label="Settings" aria-haspopup="true" aria-expanded="false">⚙️</button>
 </div>
 <nav id="menu" class="pop hidden" aria-label="Menu">
   <div id="links"></div>
-  <button id="nav-proj">🗂️ Projects</button>
+  <button id="nav-proj">🪧 Projects &amp; links</button>
   <button id="nav-fish">🐟 Fish collection</button>
   <button id="nav-chars">🎭 Change buddy</button>
   <button id="nav-story">📖 Story</button>
@@ -34,6 +36,7 @@
   <button id="b-snd" class="ico" title="Sound on / off" aria-label="Sound">🔊</button>
   <button id="b-photo" class="ico" title="Take a postcard" aria-label="Postcard">📸</button>
   <button id="b-lite" class="ico" title="Lighter graphics for slow devices" aria-label="Lite mode">🪶</button>
+  <button id="b-chatstay" class="ico" aria-label="Keep chat open after sending">📌</button>
   <button id="b-brain" class="ico" title="Smarter Pip and Momo (optional on-device model)" aria-label="Smart buddies">🧠</button>
   <button id="b-shuffle" class="ico" title="Re-roll the island layout" aria-label="Re-roll the island layout">🔀</button>
 </div>
@@ -47,6 +50,7 @@
     <p class="sub">My links, my projects, a few friends, and room to wander.</p>
     <button id="go" class="btn">Come on in</button>
     <p id="again" class="again"></p>
+    <p id="net-note" class="again"></p>
   </div>
 </section>
 
@@ -80,8 +84,10 @@
 <aside id="projects" class="panel hidden" role="dialog" aria-modal="true" aria-labelledby="ptitle">
   <div class="sheet">
     <button id="px" class="x" aria-label="Close">✕</button>
-    <h2 id="ptitle">Projects</h2>
+    <h2 id="ptitle">🪧 Projects</h2>
     <div id="plist"></div>
+    <h2 class="sec">Find me</h2>
+    <div id="clist"></div>
   </div>
 </aside>
 

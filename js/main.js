@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { sound } from './sound.js';
 import { liveWeather, WX, WX_LIST, WX_ICON, WX_NAME, fit, nextWx, fakeTemp } from './weather.js';
 import { createNet } from './net.js';
-import { initAI, BUDDIES } from './ai.js';
+import { initAI, BUDDIES, HORROR_LINES } from './ai.js';
 import { createFishing, renderDex } from './fish.js';
 import { createLayout } from './layout.js';
 import * as PR from './props.js';
@@ -49,6 +49,7 @@ const sr = Object.assign(document.createElement('p'), { ariaLive: 'polite' }); s
 const ls = { get: k => { try { return localStorage.getItem(k); } catch { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch {} }, del: k => { try { localStorage.removeItem(k); } catch {} } };
 const jget = (k, d) => { try { return JSON.parse(ls.get(k)) ?? d; } catch { return d; } };
 const prefs = jget('island.prefs', {}), savePrefs = () => ls.set('island.prefs', JSON.stringify(prefs));
+const chatStay = () => prefs.chatStay !== false; // default: the chat box stays after you send (📌 in ⚙️ turns that off)
 const lite = prefs.lite ?? (coarse && (navigator.hardwareConcurrency || 8) <= 4);
 if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}));
 { const t = document.createElement('canvas');
@@ -60,7 +61,7 @@ if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) addEven
 // The layout is computed once per seed and cached, so the island looks the same on every visit until you re-roll it (🔀).
 function getLayout() {
   if (!prefs.seed) { prefs.seed = 1 + Math.floor(Math.random() * 1e9); savePrefs(); }
-  const key = `4|${prefs.seed}|${LINKS.length}|${PROJECTS.length}`;
+  const key = `5|${prefs.seed}|${LINKS.length}|${PROJECTS.length}`;
   const c = jget('island.layout', null); if (c && c.key === key && c.L && c.L.props) return c.L;
   const L = createLayout({ seed: prefs.seed, links: LINKS.length, projects: PROJECTS.length });
   ls.set('island.layout', JSON.stringify({ key, L })); return L;
@@ -289,6 +290,19 @@ if (fires[0]) { fireLight.position.set(fires[0].x, .9, fires[0].z); scene.add(fi
 
 // clouds, golden acorns, shooting stars, rainbow
 const got = new Set(jget('island.acorns', []));
+// ---- haunted island: the 5th golden acorn unlocks it, 👻 toggles it, both are remembered ----
+if (got.size >= 5 && !prefs.horrorUnlocked) { prefs.horrorUnlocked = true; prefs.horrorOn = false; savePrefs(); } // found them all before this update
+let horrorT = prefs.horrorUnlocked && prefs.horrorOn ? 1 : 0, horror = horrorT; // horror eases toward horrorT; starts settled so a reload does not fade in
+const HBG = new THREE.Color(0x1a0b10), HHEM = new THREE.Color(0x5a2a3a), HGND = new THREE.Color(0x1a0a10), HSUN = new THREE.Color(0xb02a2a), HCOL = new THREE.Color(0x2b2230), HWATER = new THREE.Color(0x1b1020), HCLOUD = new THREE.Color(0x2a1418), HRED = new THREE.Color(0xff3a2a), HLAMP = new THREE.Color(0xff3a1a), HFIRE = new THREE.Color(0xff3a1a);
+const vigEl = $('#vig');
+// the Watcher: a tall dark figure that only exists in haunted mode. It never moves while you look at it and never touches you.
+const stalker = new THREE.Group(), SM = new THREE.MeshBasicMaterial({ color: 0x050306 }), SE = new THREE.MeshBasicMaterial({ color: 0xff2a2a, fog: false });
+stalker.visible = false; scene.add(stalker);
+PR.mk(new THREE.CylinderGeometry(.16, .3, 2.2, 8), SM, [0, 1.1, 0], stalker, false);
+PR.mk(new THREE.SphereGeometry(.24, 10, 8), SM, [0, 2.4, 0], stalker, false);
+[-.34, .34].forEach(x => PR.mk(new THREE.CylinderGeometry(.045, .03, 1.5, 5), SM, [x, 1.35, 0], stalker, false));
+[-.09, .09].forEach(x => PR.mk(new THREE.SphereGeometry(.04, 6, 6), SE, [x, 2.43, .2], stalker, false));
+const st = { dist: 11, stare: 0, creep: 0, beat: 0, creak: rand(8, 20), has: false };
 const acorns = L.acorns.map((p, i) => {
   const g = new THREE.Group();
   mk(sph(.18, 12, 10), M(0xf0b030, .3), [0, 0, 0], g); mk(sph(.13, 10, 8), M(0xb8862a, .6), [0, .14, 0], g).scale.y = .6;
@@ -301,26 +315,42 @@ const rb = new THREE.Group();
 ['#e0525a', '#f08a3c', '#f2c94c', '#6cc070', '#4aa3df', '#5a6fd0', '#9a6bd0'].forEach((c, i) => rb.add(new THREE.Mesh(new THREE.TorusGeometry(42 + i * 1.1, .55, 6, 64, Math.PI), new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0, fog: false, depthWrite: false }))));
 rb.position.set(14, -3, -62); scene.add(rb);
 
-// ---- signs: links + project board (positions come from the layout) ----
-function badge(l) {
-  return tex(g => {
-    g.fillStyle = l.color; g.beginPath(); g.roundRect(16, 16, 224, 224, 64); g.fill();
-    g.fillStyle = '#fff'; g.textAlign = 'center';
-    g.font = '100px serif'; g.fillText(l.emoji, 128, 140);
-    g.font = `bold ${l.label.length > 10 ? 26 : 34}px ui-rounded, system-ui, sans-serif`; g.fillText(l.label, 128, 207);
+// ---- the signboard: projects and contacts painted on one big board (position comes from the layout) ----
+function boardTex() {
+  const W = 1024, H = 585, c = document.createElement('canvas'); c.width = W; c.height = H;
+  const g = c.getContext('2d'), F = 'ui-rounded, system-ui, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif';
+  const bg = g.createLinearGradient(0, 0, 0, H); bg.addColorStop(0, '#e6b87f'); bg.addColorStop(1, '#d09c62'); g.fillStyle = bg; g.fillRect(0, 0, W, H);
+  g.strokeStyle = 'rgba(120,80,40,.2)'; g.lineWidth = 3;
+  for (let y = 117; y < H; y += 117) { g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke(); }
+  g.strokeStyle = 'rgba(120,80,40,.09)'; g.lineWidth = 2;
+  for (let i = 0; i < 46; i++) { const y = (i * 53) % H, x = (i * 211) % W; g.beginPath(); g.moveTo(x, y); g.lineTo(x + 110 + (i % 5) * 45, y + (i % 3) - 1); g.stroke(); }
+  g.strokeStyle = '#7a5230'; g.lineWidth = 14; g.strokeRect(7, 7, W - 14, H - 14);
+  const fit = (t, px, max, wt = 800) => { let f = px; do { g.font = `${wt} ${f}px ${F}`; f -= 2; } while (g.measureText(t).width > max && f > 18); };
+  g.textBaseline = 'middle'; g.textAlign = 'left';
+  g.fillStyle = '#5a3a22'; g.font = `800 46px ${F}`; g.fillText('PROJECTS', 46, 54); g.fillText('FIND ME', 636, 54);
+  g.setLineDash([10, 12]); g.strokeStyle = '#8a6038'; g.lineWidth = 4; g.beginPath(); g.moveTo(606, 40); g.lineTo(606, 510); g.stroke(); g.setLineDash([]);
+  const rows = 4, y0 = 90, pitch = 104, rh = 92, more = PROJECTS.length > rows;
+  PROJECTS.slice(0, more ? rows - 1 : rows).forEach((p, i) => {
+    const y = y0 + i * pitch;
+    g.fillStyle = '#fff6e0'; g.strokeStyle = '#b88a55'; g.lineWidth = 4; g.beginPath(); g.roundRect(40, y, 540, rh, 24); g.fill(); g.stroke();
+    g.font = `60px ${F}`; g.fillStyle = '#000'; g.fillText(p.emoji, 58, y + rh / 2 + 4);
+    fit(p.name, 56, 410); g.fillStyle = '#4a3320'; g.fillText(p.name, 140, y + rh / 2 + 2);
   });
+  if (more) { const y = y0 + (rows - 1) * pitch; g.fillStyle = '#4a3320'; g.font = `800 40px ${F}`; g.fillText(`+ ${PROJECTS.length - rows + 1} more…`, 62, y + rh / 2); }
+  LINKS.slice(0, rows).forEach((l, i) => {
+    const y = y0 + i * pitch;
+    g.fillStyle = l.color; g.beginPath(); g.roundRect(636, y, 350, rh, 46); g.fill();
+    g.fillStyle = '#fff'; g.font = `56px ${F}`; g.fillText(l.emoji, 660, y + rh / 2 + 4);
+    fit(l.label, 52, 220); g.fillText(l.label, 744, y + rh / 2 + 2);
+  });
+  g.textAlign = 'center'; g.fillStyle = '#6b4a2c'; g.font = `800 32px ${F}`;
+  g.fillText(coarse ? 'Tap the board to open' : 'Walk up and press E, or click', W / 2, 553);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t;
 }
-const SPOTS = L.stations.map(s => s.kind === 'link'
-  ? { ...LINKS[s.idx], x: s.x, z: s.z }
-  : { label: PROJECTS[s.idx].name, emoji: PROJECTS[s.idx].emoji, color: '#4f9d69', x: s.x, z: s.z, panel: true, proj: s.idx });
-const stations = SPOTS.map(l => {
-  mk(cyl(1.1, 1.3, .7, 32), M(0xefe3c8), [l.x, .35, l.z]);
-  mk(new THREE.TorusGeometry(1.15, .09, 12, 40), M(l.color), [l.x, .72, l.z]).rotation.x = Math.PI / 2;
-  const sign = new THREE.Mesh(new THREE.PlaneGeometry(1.7, 1.7), new THREE.MeshBasicMaterial({ map: badge(l), transparent: true, side: THREE.DoubleSide }));
-  sign.position.set(l.x, 2.2, l.z); scene.add(sign);
-  obstacles.push([l.x, l.z, 1.4]);
-  return { ...l, sign, hover: false, h: l.panel ? 2.1 : 3.3 };
-});
+const B0 = L.stations[0], board = PR.signboard(boardTex());
+board.position.set(B0.x, 0, B0.z); scene.add(board);
+for (let x = -2.6; x < 2.7; x += 1.04) obstacles.push([B0.x + x, B0.z, .55]); // posts and board are one solid wall
+const stations = [{ label: 'Projects & links', emoji: '🪧', x: B0.x, z: B0.z, hw: B0.hw + .2, sign: board, hover: false }];
 
 // ---- fishing, postcard, settings ----
 const fishing = createFishing({ scene, pond: POND, toast, sound });
@@ -360,21 +390,20 @@ $('#b-lite').classList.toggle('on', !!lite); $('#b-lite').title = lite ? 'Lite g
 press('#b-lite', () => { prefs.lite = !lite; savePrefs(); location.reload(); });
 press('#b-shuffle', () => { prefs.seed = 1 + Math.floor(Math.random() * 1e9); savePrefs(); location.reload(); });
 press('#b-brain', () => { closePops(); openPanel($('#brain')); });
+const syncStay = () => { $('#b-chatstay').classList.toggle('on', chatStay()); $('#b-chatstay').title = chatStay() ? 'Chat stays open after sending (tap to auto-hide it)' : 'Chat hides after sending (tap to keep it open)'; };
+press('#b-chatstay', () => { prefs.chatStay = !chatStay(); savePrefs(); syncStay(); toast(chatStay() ? '📌 Chat stays open' : '💬 Chat hides after sending', '#8fa39a'); });
+syncStay();
 
 // ---- panels ----
 let panelOpen = false, activePanel;
 const panel = $('#projects');
 $('#plist').innerHTML = PROJECTS.map(p => `<a class="proj" href="${p.url}" target="_blank" rel="noopener"><b>${p.emoji}</b><div><h3>${p.name}</h3><p>${p.desc}</p>${p.tags.map(t => `<i>${t}</i>`).join('')}</div><em>↗</em></a>`).join('');
-function openPanel(el = panel) { closePops(); closeChat(); activePanel = el; panelOpen = true; el.classList.remove('hidden'); setTimeout(() => el.querySelector('.x').focus(), 60); }
-function closePanel() { panelOpen = false; activePanel && activePanel.classList.add('hidden'); }
-function openProject(i) {
-  openPanel();
-  const cards = document.querySelectorAll('.proj');
-  cards.forEach((c, j) => c.classList.toggle('hl', j === i));
-  cards[i] && cards[i].scrollIntoView({ block: 'nearest' });
-}
+let chatWas = false;
+function openPanel(el = panel) { closePops(); chatWas = !chat.classList.contains('hidden'); closeChat(); activePanel = el; panelOpen = true; el.classList.remove('hidden'); setTimeout(() => el.querySelector('.x').focus(), 60); }
+function closePanel() { panelOpen = false; activePanel && activePanel.classList.add('hidden'); if (chatWas && chatStay()) { chat.classList.remove('hidden'); $('#b-chat').classList.add('on'); } chatWas = false; }
 [panel, $('#brain'), $('#dex'), $('#story-confirm'), $('#chars')].forEach(p => { p.querySelector('.x').onclick = closePanel; p.addEventListener('pointerdown', e => { if (e.target === p) closePanel(); }); });
-const open = s => { sound.chime(); return s.panel ? openProject(s.proj) : window.open(s.url, '_blank', 'noopener'); };
+const open = () => { sound.chime(); openPanel(); };
+$('#clist').innerHTML = LINKS.map(l => `<a class="contact" style="background:${l.color}" href="${l.url}" target="_blank" rel="noopener"><b>${l.emoji}</b>${l.label}</a>`).join('');
 $('#links').innerHTML = LINKS.map(l => `<a href="${l.url}" target="_blank" rel="noopener">${l.emoji} ${l.label}</a>`).join('');
 $('#nav-proj').onclick = () => openPanel();
 $('#nav-fish').onclick = () => { renderDex($('#dex-grid'), fishing.dex); openPanel($('#dex')); };
@@ -443,7 +472,6 @@ function makePlayer(type, name) {
 function setType(o, type) {
   if (o.core) o.mesh.remove(o.core);
   Object.assign(o, build(type), { type });
-  if (o.crowned) mk(new THREE.ConeGeometry(.16, .2, 5), M(0xf0b030, .3), [0, KINDS[type].k === 'b' ? 1.65 : 1.25, 0], o.core);
   o.mesh.add(o.core);
 }
 function say(o, msg, hold) {
@@ -477,7 +505,8 @@ function animate(o, dt, t) {
   const air = o.y > .001, bot = KINDS[o.type].k === 'b';
   const hop = !air && o.moving ? Math.abs(Math.sin(t * 10)) * (bot ? .08 : .22) : 0;
   o.land *= Math.exp(-dt * 9);
-  const s = air ? 1 + Math.min(Math.abs(o.vy) * .018, .25) : 1 - o.land + Math.sin(t * 3) * .015;
+  o.sl = (o.sl || 0) + ((o.sleep ? 1 : 0) - (o.sl || 0)) * Math.min(1, dt * 3); // asleep: sink into a slow-breathing loaf
+  const s = (air ? 1 + Math.min(Math.abs(o.vy) * .018, .25) : 1 - o.land + Math.sin(t * 3) * .015) * (1 - .38 * o.sl) + Math.sin(t * 1.6) * .025 * o.sl;
   if (o.emo > 0) { o.emo -= dt; o.core.rotation.y += dt * 9; } else o.core.rotation.y = 0;
   o.core.position.y = o.y + hop + (o.emo > 0 ? Math.abs(Math.sin(t * 9)) * .3 : 0) + (bot ? Math.sin(t * 3) * .04 : 0);
   o.core.scale.set(1 / Math.sqrt(s), s, 1 / Math.sqrt(s));
@@ -490,23 +519,44 @@ function place(o) {
   for (const e of [o.n, o.b]) { e.style.display = tmp.z > 1 ? 'none' : 'block'; e.style.transform = `translate(${x}px,${y}px) translate(-50%,-100%)`; }
 }
 const dropPlayer = o => { scene.remove(o.mesh); o.n.remove(); o.b.remove(); };
+// ---- online: on by default once you are in the world (needs the relay in js/config.js); 🌐 turns it off and remembers that ----
 const netBtn = $('#b-net');
+let netManual = false;
+const netOffTitle = () => net.relay ? 'Go online and meet other visitors' : 'Go online (peer-to-peer: other visitors can see your IP address)';
 const net = createNet({
   make: (t, n) => makePlayer(KINDS[t] ? t : 'slime', n), retype: (o, t) => KINDS[t] && setType(o, t),
   say, drop: dropPlayer,
   count: n => { netBtn.innerHTML = `🌐<small>${n + 1}</small>`; netBtn.classList.add('on'); },
   status: s => {
     if (s === 'connecting') { netBtn.innerHTML = '🌐<small>…</small>'; netBtn.title = 'Connecting…'; }
-    else if (s === 'online') { netBtn.title = net.relay ? `Online in room “${net.room}” · tap to leave` : 'Online (peer-to-peer) · tap to leave'; toast(`🌐 Online · room “${net.room}”`); }
+    else if (s === 'online') {
+      netBtn.title = `Online in room “${net.room}” (7 max) · tap to go offline`;
+      if (netManual || !prefs.onlineSeen) { toast(prefs.onlineSeen ? `🌐 Online · room “${net.room}”` : '🌐 Online · others can see you · tap 🌐 in ⚙️ to go offline'); prefs.onlineSeen = true; savePrefs(); }
+      else if (netBtn.dataset.was === 'retry') toast('🌐 Back online');
+    }
     else if (s === 'retry') { netBtn.innerHTML = '🌐<small>…</small>'; netBtn.title = 'Connection lost, retrying…'; toast('🌐 Connection lost, retrying…', '#d9a441'); }
-    else { netBtn.innerHTML = '🌐'; netBtn.classList.remove('on'); netBtn.title = net.relay ? 'Go online and meet other visitors' : 'Go online (peer-to-peer: other visitors can see your IP address)'; }
+    else { netBtn.innerHTML = '🌐'; netBtn.classList.remove('on'); netBtn.title = netOffTitle(); }
+    netBtn.dataset.was = s;
   },
 });
-netBtn.title = net.relay ? 'Go online and meet other visitors' : netBtn.title;
-press('#b-net', async () => {
-  if (net.on()) { net.leave(); return; }
-  try { await net.join(); } catch { toast(net.relay ? '🌐 Couldn’t reach the server. Try again in a moment.' : '🌐 Couldn’t connect to other visitors from here.', '#d9645a'); }
+netBtn.title = netOffTitle();
+async function goOnline(manual) {
+  netManual = manual;
+  try { await net.join(); if (manual) { prefs.online = true; savePrefs(); } }
+  catch (e) {
+    netBtn.title = 'Offline: couldn’t reach the server (tap to try again)';
+    if (manual) toast(e.message === 'full' ? (net.public || !net.relay ? '🌐 All rooms are full right now (7 each). Try again soon.' : `🌐 Room “${net.room}” is full (7 max).`) : net.relay ? '🌐 Couldn’t reach the server. Try again in a moment.' : '🌐 Couldn’t connect to other visitors from here.', '#d9645a');
+  }
+}
+press('#b-net', () => {
+  if (net.on()) { net.leave(); prefs.online = false; savePrefs(); toast('🌐 Offline · the island is all yours', '#8fa39a'); return; }
+  goOnline(true);
 });
+let hintedChat = false;
+const netSay = v => { // public rooms carry emotes only; the first blocked sentence explains how to chat with friends
+  const r = net.say(v);
+  if (r === 'blocked' && !hintedChat) { hintedChat = true; toast('💬 Text isn’t shared in public rooms. Open the page with ?room=yourname to chat with friends.', '#8fa39a'); }
+};
 
 // ---- Pip and Momo: world chat, personalities, weather-aware behaviour ----
 let state = 'intro', sel = prefs.avatar || 'slime', me, nextHop = 0, nearby = null, pondNear = false;
@@ -526,7 +576,7 @@ const ai = initAI({
     ...LINKS.map(l => ({ k: [l.label.toLowerCase()], a: `${l.emoji} ${l.label}: ${l.url}`, short: `${l.label} is at ${l.url}` })),
   ],
   facts: `Erdian's projects: ${PROJECTS.map(p => `${p.name}: ${p.desc} (${p.tags.join(', ')})`).join('; ')}. Links: ${LINKS.map(l => l.label).join(', ')}.`,
-  ctx: () => ({ wx, wxName: WX_NAME[wx], icon: WX_ICON[wx], temp: currentTemp(), night, cold, sheltered: shel > .5, acorns: got.size, frozen: ice > .6, aurora: aurora > .5, where }),
+  ctx: () => ({ wx, wxName: WX_NAME[wx], icon: WX_ICON[wx], temp: currentTemp(), night, cold, sheltered: shel > .5, acorns: got.size, frozen: ice > .6, aurora: aurora > .5, horror: horror > .5, where }),
 });
 const needShelter = n => n.who === 'pip' ? fx.rain > .25 || fx.snow > .3 || fx.storm > .2 || fx.heat > .6 : fx.storm > .5 || fx.snow > .55 || fx.heat > .8;
 const shelterSpot = n => {
@@ -549,6 +599,23 @@ function npcTick(n, dt) {
     n.near = d < 2.8; return;
   }
   if (n.mode === 'listen') { o.moving = false; face(mp.x, mp.z); if ((n.hold -= dt) <= 0) n.mode = 'wander'; return; }
+  // night: Pip and Momo go to bed in the lean-to (walk to its open front first, then step in so they never push through a post)
+  const lt = shelters.find(x => x.k === 'leanto');
+  if (lt && night && nightMix > .6 && horrorT < .5) {
+    const bx = n.who === 'pip' ? -.5 : .6, bed = loc(lt, bx, -.35), front = loc(lt, bx, 1.9);
+    if (n.bedStage && Math.hypot(bed.x - p.x, bed.z - p.z) > 4) n.bedStage = 0; // got pulled away (a chat): take the long way again
+    const tg = n.bedStage ? bed : front, dx = tg.x - p.x, dz = tg.z - p.z;
+    if (Math.hypot(dx, dz) > .3) { o.moving = true; step(o, dx, dz, dt, 3); }
+    else if (!n.bedStage) n.bedStage = 1;
+    else {
+      o.moving = false; o.mesh.rotation.y += wrap(lt.rot - o.mesh.rotation.y) * (1 - Math.exp(-dt * 4));
+      if (!o.sleep) { o.sleep = true; n.z = rand(1.5, 3); }
+      if ((n.z -= dt) <= 0) { say(o, '💤', 2200); n.z = rand(5, 7); }
+    }
+    n.t = 0; return;
+  }
+  n.bedStage = 0;
+  if (o.sleep) { o.sleep = false; say(o, n.who === 'pip' ? 'Good morning! ☀️' : 'mmh... morning.'); }
   const sp = needShelter(n) ? shelterSpot(n) : null;
   if (sp) { // weather too rough: head for cover and stay there
     const dx = sp.x - p.x, dz = sp.z - p.z;
@@ -558,6 +625,7 @@ function npcTick(n, dt) {
   if ((n.t -= dt) <= 0) {
     const stomp = n.who === 'momo' && fx.rain > .2 && puddles.length;
     if (stomp) { const q = pick(puddles).position; n.goal.set(q.x, 0, q.z); n.t = rand(2.5, 4.5); } // Momo loves puddles
+    else if (horror > .5) { n.goal.copy(freeSpot(mp.x, mp.z, 3.5)); n.t = rand(3, 5); if (Math.random() < .5) say(o, pick(HORROR_LINES[n.who])); } // haunted: they huddle close to you
     else { n.goal.copy(freeSpot(0, 3, 9)); n.t = rand(4, 8); if (Math.random() < .45) say(o, pick(NPC_LINES)); }
   }
   const dx = n.goal.x - p.x, dz = n.goal.z - p.z;
@@ -568,7 +636,8 @@ function npcTick(n, dt) {
 async function converse(n, q) {
   if (!n) return;
   if (n.busy) return say(n.o, n.who === 'pip' ? 'One sec! 🐰' : 'hold on...');
-  n.busy = true; n.mode = 'come'; n.near = false; say(n.o, '…', 9000);
+  const woke = n.o.sleep; if (woke) { n.o.sleep = false; n.bedStage = 0; }
+  n.busy = true; n.mode = 'come'; n.near = false; say(n.o, woke ? (n.who === 'pip' ? 'Hm? Oh! One sec… 🥱' : 'five more minutes...') : '…', 9000);
   const t0 = performance.now();
   try {
     const arrive = new Promise(ok => { const id = setInterval(() => { if (n.near || performance.now() - t0 > 2800) { clearInterval(id); ok(); } }, 100); });
@@ -579,7 +648,7 @@ async function converse(n, q) {
   n.mode = 'listen'; n.busy = false;
 }
 function handleChat(v) {
-  say(me, v); net.say(v);
+  say(me, v); netSay(v);
   // "@Pip what's the weather? @Momo any fish?" → each buddy gets the words after their own name
   const ms = [...v.matchAll(/@(pip|momo|all|everyone|both)\b/gi)], jobs = new Map();
   const lead = ms.length ? v.slice(0, ms[0].index).trim() : '';
@@ -598,6 +667,7 @@ document.querySelectorAll('.pick').forEach(b => b.onclick = () => {
   sel = b.dataset.t; me && setType(me, sel); syncPicks(); b.blur();
   if (b.closest('#chars')) { prefs.avatar = sel; savePrefs(); closePanel(); toast(`${b.firstElementChild.textContent} Saved for next time`); }
 });
+if (net.relay && prefs.online !== false) $('#net-note').textContent = '🌐 Other visitors can see your buddy. Turn that off anytime with 🌐 in ⚙️.';
 if (prefs.avatar) { const c = CHARS.find(x => x[0] === prefs.avatar); if (c) $('#again').textContent = `Welcome back · playing as ${c[1]} ${c[2]} (change in ☰)`; }
 function beginPlay() {
   state = 'play'; $('#pick').classList.add('hidden'); $('#hud').classList.remove('hidden'); $('#b-menu').classList.remove('hidden');
@@ -608,12 +678,14 @@ function beginPlay() {
     o.mesh.position.copy(q); npcs.push({ o, who, goal: q.clone(), t: rand(1, 4), mode: 'wander', hold: 0, busy: false, near: false });
     setTimeout(() => say(o, NPC_LINES[i]), 1500 + i * 1200);
   });
+  if (prefs.horrorUnlocked) { hb.classList.remove('hidden'); hb.classList.toggle('on', horrorT === 1); hb.setAttribute('aria-pressed', horrorT === 1); if (horrorT === 1) haunt(true); }
+  if (net.relay && prefs.online !== false) goOnline(false); // online by default; a quiet failure just leaves 🌐 off
   if (coarse) toast('👈 left side moves · right side looks 👉', '#7fb0d6');
   setTimeout(() => toast('💬 Tip: type @Pip or @Momo to talk to them', '#7fb0d6'), 2500);
 }
 $('#go').onclick = () => {
   sound.start(); $('#intro').classList.add('hidden');
-  me = makePlayer(sel, 'You'); if (got.size >= 5) { me.crowned = true; setType(me, sel); }
+  me = makePlayer(sel, 'You');
   if (prefs.avatar) return beginPlay(); // returning visitor: straight in with the saved buddy
   state = 'pick'; $('#pick').classList.remove('hidden'); syncPicks();
 };
@@ -627,12 +699,12 @@ const chat = $('#chat'), msg = $('#msg');
 function openChat(pre) { if (state !== 'play' || panelOpen) return; closePops(); keys.clear(); chat.classList.remove('hidden'); $('#b-chat').classList.add('on'); if (pre) msg.value = pre; msg.focus(); }
 function closeChat() { chat.classList.add('hidden'); $('#b-chat').classList.remove('on'); msg.blur(); }
 $('#b-chat').onclick = () => chat.classList.contains('hidden') ? openChat() : closeChat();
-chat.addEventListener('submit', e => { e.preventDefault(); const v = msg.value.trim(); msg.value = ''; closeChat(); if (v) handleChat(v); });
+chat.addEventListener('submit', e => { e.preventDefault(); const v = msg.value.trim(); msg.value = ''; if (chatStay()) msg.blur(); else closeChat(); if (v) handleChat(v); }); // blur: movement keys work again, Enter types again
 $('#quick').addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b) return;
-  if (b.dataset.e) { say(me, b.dataset.e); net.say(b.dataset.e); } else { msg.value = b.dataset.ins + msg.value.replace(/^@\w+\s*/, ''); msg.focus(); }
+  if (b.dataset.e) { say(me, b.dataset.e); netSay(b.dataset.e); } else { msg.value = b.dataset.ins + msg.value.replace(/^@\w+\s*/, ''); msg.focus(); }
 });
-msg.addEventListener('keydown', e => { if (e.key === 'Escape') closeChat(); });
+msg.addEventListener('keydown', e => { if (e.key === 'Escape') chatStay() ? msg.blur() : closeChat(); });
 addEventListener('keydown', e => {
   if (e.key === 'Escape') { if (panelOpen) return closePanel(); closePops(); }
   if (/INPUT|SELECT/.test(e.target.tagName) || panelOpen) return;
@@ -667,13 +739,13 @@ function moveStick(e) {
 function endStick() { stick = null; joy = { x: 0, y: 0 }; knob.style.transform = ''; joyEl.classList.remove('on'); joyEl.style.left = joyEl.style.top = joyEl.style.bottom = ''; }
 const ray = new THREE.Raycaster(), mp = new THREE.Vector2();
 const aim = e => { mp.set(e.clientX / innerWidth * 2 - 1, -(e.clientY / innerHeight) * 2 + 1); ray.setFromCamera(mp, camera); };
-const hitSign = e => { aim(e); const h = ray.intersectObjects(stations.map(s => s.sign))[0]; return h && stations.find(s => s.sign === h.object); };
+const hitSign = e => { aim(e); const h = ray.intersectObjects(stations.map(s => s.sign), true)[0]; if (!h) return; for (let o = h.object; o; o = o.parent) { const s = stations.find(q => q.sign === o); if (s) return s; } };
 const hitNpc = e => { aim(e); const h = ray.intersectObjects(npcs.map(n => n.o.mesh), true)[0]; if (!h) return; let o = h.object; while (o) { const n = npcs.find(q => q.o.mesh === o); if (n) return n; o = o.parent; } };
 canvas.addEventListener('contextmenu', e => e.preventDefault());
 canvas.addEventListener('pointerdown', e => {
   if (state !== 'play' || panelOpen) return;
   closePops();
-  if (!chat.classList.contains('hidden') && coarse) closeChat();
+  if (!chat.classList.contains('hidden') && coarse) chatStay() ? msg.blur() : closeChat(); // phones: just tuck the keyboard away
   try { canvas.setPointerCapture(e.pointerId); } catch {}
   tap = { id: e.pointerId, x: e.clientX, y: e.clientY, t: performance.now() };
   if (e.button === 0 && e.clientX < innerWidth / 2 && !stick) { startStick(e); moveStick(e); }
@@ -730,6 +802,8 @@ renderer.setAnimationLoop(() => {
   snowCover += ((fx.snow > .1 ? .95 : 0) - snowCover) * (1 - Math.exp(-dt * (fx.snow > .1 ? .05 : cold ? .004 : .05)));
   ice += ((cold && fx.heat < .3 ? 1 : 0) - ice) * (1 - Math.exp(-dt * .12));
   nightMix += ((night ? 1 : 0) - nightMix) * a;
+  horror += (horrorT - horror) * (1 - Math.exp(-dt * .9));
+  if (Math.abs(horrorT - horror) < .003) horror = horrorT;
   phase += (phaseT - phase) * (1 - Math.exp(-dt * 1.6));
   const auroraT = nightMix > .6 && cold && fx.cloud < .4 && fx.rain < .05 && fx.snow < .05 && fx.fogN > 30 ? 1 : 0;
   aurora += (auroraT - aurora) * a2;
@@ -749,9 +823,11 @@ renderer.setAnimationLoop(() => {
   });
   cur.hi += (T.hi - cur.hi) * a; cur.si += (T.si - cur.si) * a;
   bg.copy(cur.sky); if (flash > 0) bg.lerp(FLASHC, Math.min(flash, 1) * .7);
-  scene.background = bg; scene.fog.color.copy(bg); scene.fog.near = fx.fogN; scene.fog.far = fx.fogF;
-  hemi.color.copy(cur.hs); hemi.groundColor.copy(cur.hg); hemi.intensity = cur.hi * (.45 + .55 * fx.lit) + flash * 2.2;
-  sun.color.copy(cur.sun); sun.intensity = cur.si * fx.lit + flash * 1.5;
+  if (horror > 0) bg.lerp(HBG, horror * .92);
+  scene.background = bg; scene.fog.color.copy(bg); scene.fog.near = fx.fogN + (Math.min(fx.fogN, 5) - fx.fogN) * horror; scene.fog.far = fx.fogF + (Math.min(fx.fogF, 34) - fx.fogF) * horror;
+  hemi.color.copy(cur.hs); hemi.groundColor.copy(cur.hg); hemi.intensity = cur.hi * (.45 + .55 * fx.lit) * (1 - horror * .55) + flash * 2.2;
+  sun.color.copy(cur.sun); sun.intensity = cur.si * fx.lit * (1 - horror * .6) + flash * 1.5;
+  if (horror > 0) { hemi.color.lerp(HHEM, horror * .7); hemi.groundColor.lerp(HGND, horror * .7); sun.color.lerp(HSUN, horror * .8); }
   grassM.userData.base.copy(cur.grass).lerp(DRYG, fx.heat * .55).multiplyScalar(1 - wet * .22); grassM.roughness = .9 - wet * .35;
   dirtM.userData.base.copy(cur.dirt).multiplyScalar(1 - wet * .25);
   PR.MATS.leaf.forEach((m, i) => m.userData.base.copy(cur.leaf).offsetHSL(0, 0, (i - 1) * .05).lerp(DRYL, fx.heat * .3).multiplyScalar(1 - wet * .12));
@@ -759,12 +835,13 @@ renderer.setAnimationLoop(() => {
   for (const m of PR.SNOWY) m.color.copy(m.userData.base).lerp(WHITE, snowCover * m.userData.k);
   waterM.color.copy(cur.water).lerp(DG, fx.gloom * .3);
   cloudM.color.copy(cur.cloud).lerp(CLOUDDARK, fx.gloom * .75 * (1 - nightMix * .5));
+  if (horror > 0) { for (const m of PR.SNOWY) m.color.lerp(HCOL, horror * .6); waterM.color.lerp(HWATER, horror * .8); cloudM.color.lerp(HCLOUD, horror * .8); }
 
   // sky bodies hide behind cloud
   sunS.position.set(Math.cos(phase) * 40, Math.sin(phase) * 70, -70);
   moonS.position.set(Math.cos(phase + Math.PI) * 40, Math.sin(phase + Math.PI) * 70, -70);
   sunS.material.opacity = vis(sunS.position.y) * (1 - fx.cloud * .8) * (1 - (wx === 'fog') * .5); moonS.material.opacity = vis(moonS.position.y) * (1 - fx.cloud * .7);
-  sunS.material.color.copy(cur.sun); moonS.material.color.copy(cur.sun);
+  sunS.material.color.copy(cur.sun).lerp(HRED, horror * .85); moonS.material.color.copy(cur.sun).lerp(HRED, horror * .85);
   starM.opacity = nightMix * .9 * (1 - fx.cloud * .9);
   sun.position.copy(sunS.position).lerp(moonS.position, nightMix).normalize();
   sun.position.y = Math.max(sun.position.y, .35); sun.position.normalize().multiplyScalar(24);
@@ -778,8 +855,8 @@ renderer.setAnimationLoop(() => {
   // precipitation + drifting particles
   const wv = fx.wind, snowA = clamp(fx.snow, 0, 1), leafA = clamp((wv - .55) * 2.5, 0, 1) * (1 - fx.rain) * (1 - snowA);
   const flyA = nightMix > .5 && !cold && fx.rain < .2 && snowA < .1 ? 1 : 0;
-  const mode = snowA > .05 ? 0 : leafA > .25 && nightMix < .5 ? 1 : flyA ? 2 : 3;
-  pMat.color.lerp(c1.set(mode === 0 ? 0xffffff : mode === 1 ? 0xc9b23a : 0xffe27a), a);
+  const mode = horror > .4 ? 2 : snowA > .05 ? 0 : leafA > .25 && nightMix < .5 ? 1 : flyA ? 2 : 3; // haunted: drifting red embers
+  pMat.color.lerp(c1.set(horror > .4 ? 0xff3a2a : mode === 0 ? 0xffffff : mode === 1 ? 0xc9b23a : 0xffe27a), a);
   pMat.size += ((mode === 0 ? .16 : mode === 1 ? .28 : .22) - pMat.size) * a;
   pMat.opacity += ((mode === 0 ? .5 + .45 * snowA : mode === 1 ? .85 : mode === 2 ? 1 : 0) - pMat.opacity) * a;
   for (let i = 0; i < N; i++) {
@@ -821,7 +898,9 @@ renderer.setAnimationLoop(() => {
   for (const g of flowers) { g.userData.head.scale.setScalar(1 - closeAmt * .5); g.scale.y = (1 - fx.heat * .25) * (1 - snowCover * .65); }
   for (const w of windmills) w.userData.hub.rotation.z -= dt * (.35 + wv * 3.4);
   const lampOn = clamp(Math.max(nightMix * .95, fx.gloom * .8), 0, 1);
-  PR.MATS.lamp.emissiveIntensity = lampOn * 2;
+  const flick = reduce ? 0 : .25 * (.5 + .5 * Math.sin(t * 3.1) * Math.sin(t * 1.3)); // slow, shallow: never a strobe
+  PR.MATS.lamp.emissiveIntensity = (lampOn + (1 - lampOn) * horror * .9) * 2 * (1 - horror * flick);
+  PR.MATS.lamp.emissive.setHex(0xffd27a).lerp(HLAMP, horror); fireLight.color.setHex(0xff9a4a).lerp(HFIRE, horror);
   let warmth = false;
   for (const f of fires) {
     const lit = sheltered(f.x, f.z) ? 1 : clamp(1 - fx.rain * 1.4, 0, 1), fl = f.o.userData.flames;
@@ -838,14 +917,13 @@ renderer.setAnimationLoop(() => {
 
   // camera + mood-driven sound
   const sk = key() + wx; if (sk !== lastSk) { lastSk = sk; sound.set(night, cold, wx); }
-  if ((envT -= dt) <= 0) { envT = .25; sound.env({ rain: fx.rain, snow: fx.snow, wind: fx.wind, shelter: shel, heat: fx.heat }); }
+  if ((envT -= dt) <= 0) { envT = .25; sound.horror(horror); sound.env({ rain: fx.rain, snow: fx.snow, wind: fx.wind, shelter: shel, heat: fx.heat }); }
   if (state === 'play' && me.moving && me.y === 0 && (stepT -= dt) <= 0) { sound.step(cold || snowA > .1, wet > .5 && snowCover < .3 && !sheltered(me.mesh.position.x, me.mesh.position.z)); stepT = .32; }
-  stations.forEach((s, i) => {
-    s.sign.position.y = s.h + Math.sin(t * 2 + i) * .1;
-    s.sign.lookAt(camera.position);
-    const k = s.hover ? 1.14 : 1;
-    s.sign.scale.lerp(pv.set(k, k, k), 1 - Math.exp(-dt * 10));
-  });
+  { // signboard: lanterns swing harder in the wind, the face lights up at night (and a little when hovered)
+    const u = board.userData, sw = Math.sin(t * 1.7) * (.03 + wv * .32), sw2 = Math.cos(t * 1.3 + 1) * (.02 + wv * .24);
+    u.lanterns.forEach((l, i) => { l.rotation.z = (i ? sw2 : sw) - WD.x * wv * .25; l.rotation.x = (i ? sw : sw2) + WD.z * wv * .25; });
+    u.face.emissiveIntensity += ((.1 + lampOn * .5 + (stations[0].hover ? .14 : 0)) - u.face.emissiveIntensity) * (1 - Math.exp(-dt * 8));
+  }
 
   for (const s of shelters) { // roofs turn see-through when the camera is close or you stand under them
     const d = Math.hypot(camera.position.x - s.cx, camera.position.y - 1.5, camera.position.z - s.cz), under = me && Math.hypot(me.mesh.position.x - s.cx, me.mesh.position.z - s.cz) < s.r + .4;
@@ -873,8 +951,8 @@ renderer.setAnimationLoop(() => {
     tp = [p.x + sy * cp * dd, Math.sin(pitch) * dd + 1, p.z + cy * cp * dd]; tl = [p.x, 1.1, p.z];
 
     nearby = null;
-    let best = 2.8;
-    for (const s of stations) { const d = Math.hypot(p.x - s.x, p.z - s.z); if (d < best) { best = d; nearby = s; } }
+    let best = 3.3; // distance to the board's face, not its centre: it is wide
+    for (const s of stations) { const d = Math.hypot(Math.max(0, Math.abs(p.x - s.x) - s.hw), p.z - s.z); if (d < best) { best = d; nearby = s; } }
     const pr = $('#prompt');
     pondNear = !nearby && Math.hypot(p.x - POND.x, p.z - POND.z) < POND.r + 1.8;
     if (!pondNear && fishing.active()) fishing.cancel();
@@ -892,7 +970,7 @@ renderer.setAnimationLoop(() => {
       chipT = .4;
       const aur = aurora > .5, icon = aur ? '🌌' : wx === 'clear' && night ? '🌙' : WX_ICON[wx], name = aur ? 'Aurora' : WX_NAME[wx];
       const bad = fx.rain > .2 || snowA > .2 || fx.wind > .6 || fx.heat > .5;
-      const s = `${icon} ${name} · ${currentTemp()}°${inShelter && bad ? ' · 🏠 Sheltered' : ''}${warmth && cold ? ' · 🔥 Warm' : ''}`;
+      const s = horror > .5 ? `🕯️ Haunted · ${currentTemp()}°` : `${icon} ${name} · ${currentTemp()}°${inShelter && bad ? ' · 🏠 Sheltered' : ''}${warmth && cold ? ' · 🔥 Warm' : ''}`;
       if (s !== lastChip) $('#wx').textContent = lastChip = s;
     }
   }
@@ -902,12 +980,54 @@ renderer.setAnimationLoop(() => {
   if (!reduce && fx.storm > .3) camera.position.add(pv.set(rand(-1, 1), rand(-1, 1), rand(-1, 1)).multiplyScalar(.04 * fx.storm));
   camera.lookAt(look3);
 
-  worldFx(dt, t); fishing.update(dt, t);
+  worldFx(dt, t); horrorFx(dt, t); fishing.update(dt, t);
   net.tick(dt, me, state === 'play');
   for (const o of [me, ...npcs.map(n => n.o), ...net.list()]) if (o) { animate(o, dt, t); if (state !== 'intro') place(o); }
   renderer.render(scene, camera);
   if (snap) { snap = false; takePhoto(); }
 });
+// haunted mode: vignette, the Watcher, heartbeat, creaks
+function placeWatcher() {
+  const mp = me.mesh.position;
+  for (let i = 0; i < 14; i++) {
+    const a = rand(0, 6.283), x = mp.x + Math.cos(a) * st.dist, z = mp.z + Math.sin(a) * st.dist;
+    if (Math.hypot(x, z) < 12 && obstacles.every(([ox, oz, r]) => Math.hypot(x - ox, z - oz) > r + .8)) { stalker.position.set(x, 0, z); st.has = true; st.stare = 0; return; }
+  }
+  st.has = false;
+}
+function horrorFx(dt, t) {
+  const on = horror > .5 && state === 'play';
+  vigEl.style.opacity = state === 'play' ? (horror * .75).toFixed(2) : '0';
+  if (!on) { stalker.visible = false; st.has = false; return; }
+  const mp = me.mesh.position;
+  if (!st.has) placeWatcher();
+  stalker.visible = st.has;
+  if (!st.has) return;
+  const dx = mp.x - stalker.position.x, dz = mp.z - stalker.position.z, d = Math.hypot(dx, dz);
+  stalker.rotation.y = Math.atan2(dx, dz);
+  stalker.position.y = Math.sin(t * .8) * .03;
+  tmp.copy(stalker.position); tmp.y += 1.5; tmp.project(camera);
+  const looked = tmp.z < 1 && Math.abs(tmp.x) < .4 && Math.abs(tmp.y) < .7;
+  st.stare = looked ? st.stare + dt : Math.max(0, st.stare - dt * 2);
+  if (d < 5.5 || st.stare > 2.5) placeWatcher(); // it is simply somewhere else when you look again
+  if ((st.creep += dt) > rand(25, 40)) { st.creep = 0; st.dist = Math.max(6.5, st.dist - 1.2); placeWatcher(); }
+  const near = clamp((14 - d) / 8, 0, 1);
+  if ((st.beat -= dt) <= 0) { st.beat = 1.5 - near * .7; sound.heartbeat(near); }
+  if ((st.creak -= dt) <= 0) { st.creak = rand(12, 28); sound.creak(); }
+  if (!reduce) vigEl.style.opacity = (horror * (.7 + near * .25 + .05 * Math.sin(t * 5))).toFixed(2);
+}
+const hb = $('#b-horror');
+function haunt(on) { // Pip's eyes turn red; the island does the rest
+  KINDS.pip.glow = on ? 0xff2a2a : 0xff7fb0;
+  const n = npcs.find(x => x.who === 'pip'); if (n) setType(n.o, 'pip');
+}
+function setHorror(on, quiet) {
+  horrorT = on ? 1 : 0; prefs.horrorOn = on; savePrefs(); haunt(on);
+  hb.classList.toggle('on', on); hb.classList.remove('pulse'); hb.title = on ? 'Make the island peaceful again' : 'Haunt the island'; hb.setAttribute('aria-pressed', on);
+  if (!quiet) toast(on ? '🕯️ The island feels… different' : '☀️ The island is peaceful again', on ? '#c0392b' : undefined);
+  if (!on) st.dist = 11;
+}
+press('#b-horror', () => setHorror(!prefs.horrorOn));
 function worldFx(dt, t) {
   rbT = Math.max(0, rbT - dt);
   const ro = clamp(rbT / 8, 0, 1) * .5; rb.children.forEach(r => r.material.opacity = ro);
@@ -919,7 +1039,11 @@ function worldFx(dt, t) {
     if (g.visible && Math.hypot(me.mesh.position.x - g.position.x, me.mesh.position.z - g.position.z) < 1.3) {
       g.visible = false; got.add(i); ls.set('island.acorns', JSON.stringify([...got]));
       sound.chime(); toast(`🌰 Golden acorn ${got.size}/5`, '#f0b030');
-      if (got.size === 5) { me.crowned = true; setType(me, me.type); toast('👑 All five found! Crown unlocked', '#f0b030'); }
+      if (got.size === 5) { // no crown: the fifth acorn wakes something on the island
+        prefs.horrorUnlocked = true; savePrefs(); hb.classList.remove('hidden'); hb.classList.add('pulse');
+        toast('🌰 All five found… the sky feels wrong', '#f0b030');
+        setTimeout(() => { setHorror(true, true); flash = reduce ? .3 : .8; sound.thunder(.5); toast('👻 The island is haunted now. Toggle it anytime with 👻 (top right)', '#c0392b'); }, 1400);
+      }
     }
   });
 }

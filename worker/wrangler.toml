@@ -16,4 +16,4 @@ new_sqlite_classes = ["Room"]
 # Which websites may open a connection. "*" = any site (fine to start with).
 # Once the page is live, lock it down, e.g. "https://yourname.github.io" (comma-separate several).
 ALLOWED_ORIGINS = "*"
-MAX_PER_ROOM = "40"
+MAX_PER_ROOM = "7"

@@ -59,37 +59,11 @@ export function createLayout({ seed = 1, links = 3, projects = 3 } = {}) {
   // ---- 1. keep the spawn plaza open
   B.add(0, 0, 2, 'spawn');
 
-  // ---- 2. stations on arcs behind the plaza (north = -z). Capacity per ring comes from spacing, extra items spill outward.
-  const NORTH = -Math.PI / 2;
-  function arcSlots(n, r0, gap, maxSpan, da = 0) {
-    const pts = [], step = gap / r0, per = Math.max(1, Math.floor(maxSpan / step) + 1);
-    for (let i = 0, ring = 0; i < n; ring++) {
-      const m = Math.min(per, n - i), r = r0 + ring * gap;
-      for (let j = 0; j < m; j++, i++) pts.push({ r, a: NORTH + da + (j - (m - 1) / 2) * (gap / r), ring });
-    }
-    return pts;
-  }
-  const gapP = projects <= 4 ? 3.8 : 3.4, gapL = links <= 4 ? 5 : 4.4; // roomy while there is space, tight when the island fills up
-  const projSlots = arcSlots(projects, 6.2, gapP, 1.9);
-  const linkR = Math.min(11, Math.max(10.2, Math.max(0, ...projSlots.map(s => s.r)) + 4));
-  // The camera looks north, so a far sign directly behind a near one hides it. Shift the link arc sideways to the offset
-  // where every link sits furthest (sideways) from every project, but still inside the island and near the centre line.
-  const sideX = s => Math.cos(s.a) * s.r, projX = projSlots.map(sideX);
-  let linkSlots = arcSlots(links, linkR, gapL, 2.1), linkScore = -1e9;
-  for (let i = -12; i <= 12; i++) {
-    const cand = arcSlots(links, linkR, gapL, 2.1, i * .03);
-    if (cand.some(s => Math.hypot(s.r * Math.cos(s.a), s.r * Math.sin(s.a)) > 11.2)) continue;
-    const gapX = Math.min(...cand.flatMap(c => projX.map(px => Math.abs(sideX(c) - px))), 9);
-    const sc = Math.min(gapX, 2.6) * 3 - Math.abs(i) * .05;
-    if (sc > linkScore) { linkScore = sc; linkSlots = cand; }
-  }
-  const place = (slot, kind, idx) => {
-    let [x, z] = polar(slot.r, slot.a);
-    if (Math.hypot(x, z) > 11.4) { const q = best({ gen: inRing(4, 11.2), r: 1.5, margin: .4, k: 60 }); if (q) { x = q.x; z = q.z; } }
-    out.stations.push({ kind, idx, x, z, a: slot.a }); B.add(x, z, 1.9, 'station');
-  };
-  linkSlots.forEach((s, i) => place(s, 'link', i));
-  projSlots.forEach((s, i) => place(s, 'proj', i));
+  // ---- 2. the signboard: one wide board north of the plaza, facing the spawn (north = -z).
+  // The page paints the projects and contacts on it; it is the only thing you have to walk up to.
+  const BZ = -4.9, BW = 2.5; // board centre z, half width
+  out.stations.push({ kind: 'board', x: 0, z: BZ, hw: BW });
+  B.add(0, BZ, 2.1, 'station'); B.add(-2.1, BZ, 1.15, 'station'); B.add(2.1, BZ, 1.15, 'station');
 
   // ---- 3. pond: score every grid spot (room to breathe, ~8.5 from centre, a little left of the camera's view)
   const PR = 2.6; let pond = null, ps = -1e9;
@@ -123,17 +97,12 @@ export function createLayout({ seed = 1, links = 3, projects = 3 } = {}) {
   }
   const sh = out.shelters;
 
-  // ---- 5. walkways: plaza ring + spokes to the pond and gazebo + an arc inside the project row
+  // ---- 5. walkways: plaza ring + spokes to the pond, the gazebo and the signboard
   const trim = ([ax, az], [bx, bz], by) => { const d = Math.hypot(bx - ax, bz - az) || 1, k = Math.max(0, d - by) / d; return [ax + (bx - ax) * k, az + (bz - az) * k]; };
   const runs = [];
   runs.push([[0, 0], trim([0, 0], [pond.x, pond.z], pond.r + .9)]);
   if (gz) runs.push([[0, 0], trim([0, 0], [gz.x, gz.z], 3.2)]);
-  if (projSlots.length) {
-    const r = projSlots[0].r - 1.9, spans = projSlots.filter(s => s.ring === 0), arc = [];
-    const a0 = spans[0].a - .12, a1 = spans[spans.length - 1].a + .12;
-    for (let i = 0; i <= 6; i++) arc.push(polar(r, a0 + (a1 - a0) * i / 6));
-    runs.push(arc, [[0, 0], polar(r, NORTH)]);
-  }
+  runs.push([[0, 0], [0, BZ + 2.2]]); // straight to the signboard
   for (const pts of runs) { B.lane(pts, .85); out.lanes.push(pts); }
   const solid = p => B.discs.some(d => d.kind !== 'spawn' && Math.hypot(p[0] - d.x, p[1] - d.z) < d.r + .1);
   const stone = (x, z) => { if (!solid([x, z])) out.stones.push({ x, z, s: R(.75, 1.05), rot: R(0, TAU) }); };
@@ -154,12 +123,13 @@ export function createLayout({ seed = 1, links = 3, projects = 3 } = {}) {
 
   // lamps: a ring around the plaza, then alternate sides along the spokes (max 9)
   let lampN = 0;
+  for (const sd of [-1, 1]) { const p = { x: sd * (BW + 1), z: BZ + .8 }; if (B.clear(p.x, p.z, new Set(['spawn', 'lane'])) > .4) { put('lamp', p, 0, { r: .16, foot: .3 }); lampN++; } } // one lamp at each end of the board
   const l0 = R(0, TAU);
   for (let i = 0; i < 4; i++) {
     const [x, z] = polar(3.9, l0 + i / 4 * TAU);
     if (B.clear(x, z, new Set(['spawn', 'lane'])) > .5) { put('lamp', { x, z }, 0, { r: .16, foot: .3 }); lampN++; }
   }
-  for (const pts of runs.slice(0, 3)) for (let i = 1; i < pts.length; i++) {
+  for (const pts of runs.slice(0, 2)) for (let i = 1; i < pts.length; i++) {
     const [ax, az] = pts[i - 1], [bx, bz] = pts[i], len = Math.hypot(bx - ax, bz - az) || 1;
     for (let d = 2.4; d < len && lampN < 9; d += 4.6) {
       const side = lampN % 2 ? 1 : -1, x = ax + (bx - ax) * d / len - (bz - az) / len * 1.25 * side, z = az + (bz - az) * d / len + (bx - ax) / len * 1.25 * side;
