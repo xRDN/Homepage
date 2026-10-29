@@ -1,0 +1,19 @@
+name = "island-relay"
+main = "src/index.js"
+compatibility_date = "2025-01-01"
+
+# One Durable Object per room. It keeps who-is-where in memory and fans messages out over WebSockets.
+[[durable_objects.bindings]]
+name = "ROOM"
+class_name = "Room"
+
+# SQLite-backed Durable Objects are the ones available on Cloudflare's free plan.
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Room"]
+
+[vars]
+# Which websites may open a connection. "*" = any site (fine to start with).
+# Once the page is live, lock it down, e.g. "https://yourname.github.io" (comma-separate several).
+ALLOWED_ORIGINS = "*"
+MAX_PER_ROOM = "40"

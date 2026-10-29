@@ -60,7 +60,7 @@ if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) addEven
 // The layout is computed once per seed and cached, so the island looks the same on every visit until you re-roll it (🔀).
 function getLayout() {
   if (!prefs.seed) { prefs.seed = 1 + Math.floor(Math.random() * 1e9); savePrefs(); }
-  const key = `3|${prefs.seed}|${LINKS.length}|${PROJECTS.length}`;
+  const key = `4|${prefs.seed}|${LINKS.length}|${PROJECTS.length}`;
   const c = jget('island.layout', null); if (c && c.key === key && c.L && c.L.props) return c.L;
   const L = createLayout({ seed: prefs.seed, links: LINKS.length, projects: PROJECTS.length });
   ls.set('island.layout', JSON.stringify({ key, L })); return L;
@@ -316,10 +316,10 @@ const SPOTS = L.stations.map(s => s.kind === 'link'
 const stations = SPOTS.map(l => {
   mk(cyl(1.1, 1.3, .7, 32), M(0xefe3c8), [l.x, .35, l.z]);
   mk(new THREE.TorusGeometry(1.15, .09, 12, 40), M(l.color), [l.x, .72, l.z]).rotation.x = Math.PI / 2;
-  const sign = new THREE.Mesh(new THREE.PlaneGeometry(1.9, 1.9), new THREE.MeshBasicMaterial({ map: badge(l), transparent: true, side: THREE.DoubleSide }));
-  sign.position.set(l.x, 2.4, l.z); scene.add(sign);
+  const sign = new THREE.Mesh(new THREE.PlaneGeometry(1.7, 1.7), new THREE.MeshBasicMaterial({ map: badge(l), transparent: true, side: THREE.DoubleSide }));
+  sign.position.set(l.x, 2.2, l.z); scene.add(sign);
   obstacles.push([l.x, l.z, 1.4]);
-  return { ...l, sign, hover: false };
+  return { ...l, sign, hover: false, h: l.panel ? 2.1 : 3.3 };
 });
 
 // ---- fishing, postcard, settings ----
@@ -490,15 +490,22 @@ function place(o) {
   for (const e of [o.n, o.b]) { e.style.display = tmp.z > 1 ? 'none' : 'block'; e.style.transform = `translate(${x}px,${y}px) translate(-50%,-100%)`; }
 }
 const dropPlayer = o => { scene.remove(o.mesh); o.n.remove(); o.b.remove(); };
+const netBtn = $('#b-net');
 const net = createNet({
   make: (t, n) => makePlayer(KINDS[t] ? t : 'slime', n), retype: (o, t) => KINDS[t] && setType(o, t),
-  say, drop: dropPlayer, count: n => { $('#b-net').innerHTML = `🌐<small>${n + 1}</small>`; $('#b-net').classList.add('on'); },
+  say, drop: dropPlayer,
+  count: n => { netBtn.innerHTML = `🌐<small>${n + 1}</small>`; netBtn.classList.add('on'); },
+  status: s => {
+    if (s === 'connecting') { netBtn.innerHTML = '🌐<small>…</small>'; netBtn.title = 'Connecting…'; }
+    else if (s === 'online') { netBtn.title = net.relay ? `Online in room “${net.room}” · tap to leave` : 'Online (peer-to-peer) · tap to leave'; toast(`🌐 Online · room “${net.room}”`); }
+    else if (s === 'retry') { netBtn.innerHTML = '🌐<small>…</small>'; netBtn.title = 'Connection lost, retrying…'; toast('🌐 Connection lost, retrying…', '#d9a441'); }
+    else { netBtn.innerHTML = '🌐'; netBtn.classList.remove('on'); netBtn.title = net.relay ? 'Go online and meet other visitors' : 'Go online (peer-to-peer: other visitors can see your IP address)'; }
+  },
 });
+netBtn.title = net.relay ? 'Go online and meet other visitors' : netBtn.title;
 press('#b-net', async () => {
-  const b = $('#b-net');
-  if (net.on()) { net.leave(); b.innerHTML = '🌐'; b.classList.remove('on'); return; }
-  b.innerHTML = '🌐<small>…</small>';
-  try { await net.join(); } catch { b.innerHTML = '🌐'; b.title = 'Unavailable right now'; }
+  if (net.on()) { net.leave(); return; }
+  try { await net.join(); } catch { toast(net.relay ? '🌐 Couldn’t reach the server. Try again in a moment.' : '🌐 Couldn’t connect to other visitors from here.', '#d9645a'); }
 });
 
 // ---- Pip and Momo: world chat, personalities, weather-aware behaviour ----
@@ -834,7 +841,7 @@ renderer.setAnimationLoop(() => {
   if ((envT -= dt) <= 0) { envT = .25; sound.env({ rain: fx.rain, snow: fx.snow, wind: fx.wind, shelter: shel, heat: fx.heat }); }
   if (state === 'play' && me.moving && me.y === 0 && (stepT -= dt) <= 0) { sound.step(cold || snowA > .1, wet > .5 && snowCover < .3 && !sheltered(me.mesh.position.x, me.mesh.position.z)); stepT = .32; }
   stations.forEach((s, i) => {
-    s.sign.position.y = 2.4 + Math.sin(t * 2 + i) * .12;
+    s.sign.position.y = s.h + Math.sin(t * 2 + i) * .1;
     s.sign.lookAt(camera.position);
     const k = s.hover ? 1.14 : 1;
     s.sign.scale.lerp(pv.set(k, k, k), 1 - Math.exp(-dt * 10));
@@ -862,7 +869,8 @@ renderer.setAnimationLoop(() => {
     shel += ((inShelter ? 1 : 0) - shel) * (1 - Math.exp(-dt * 6));
     step(me, ix * cy - iz * sy, -ix * sy - iz * cy, dt, 5 * fx.spd * (1 - snowCover * .1));
     if (wv > .5 && !inShelter && !panelOpen) { const push = (wv - .45) * 2.2; p.x += WD.x * push * dt; p.z += WD.z * push * dt; resolve(me); } // gusts shove you, roofs stop them
-    tp = [p.x + sy * cp * dist, Math.sin(pitch) * dist + 1, p.z + cy * cp * dist]; tl = [p.x, 1.1, p.z];
+    const dd = dist * (camera.aspect < 1 ? Math.min(1.55, 1 + (1 - camera.aspect) * .9) : 1); // portrait phones see less sideways, so pull back
+    tp = [p.x + sy * cp * dd, Math.sin(pitch) * dd + 1, p.z + cy * cp * dd]; tl = [p.x, 1.1, p.z];
 
     nearby = null;
     let best = 2.8;

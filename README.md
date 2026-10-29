@@ -29,6 +29,26 @@ Quick mode needs no download. The 🧠 icon in settings loads an optional on-dev
 - Fishing at the pond: N / R / SR / SSR fish (60 / 28 / 10 / 2 % base, better in rain, at night and under an aurora). Ice or a storm blocks fishing.
 - Five golden acorns are hidden around the island; find them all for a crown.
 
+## Meeting other visitors (multiplayer)
+
+Press 🌐 in the ⚙️ panel and everyone online in the same room appears on your island, with their names and chat bubbles.
+
+It runs through a tiny relay server in `worker/` (a Cloudflare Worker + Durable Object, free plan is enough). Every visitor opens a WebSocket to it, so it works across any network, and nobody sees anybody's IP address. The relay keeps only who is where, in memory. It stores nothing and logs no chat.
+
+**Set it up once (about 5 minutes):**
+
+1. Make a free account at cloudflare.com (no card needed for this).
+2. In a terminal: `cd worker && npm install && npx wrangler login && npx wrangler deploy`
+3. It prints an address like `https://island-relay.YOUR-NAME.workers.dev`. Open `js/config.js` and put it in as `wss://island-relay.YOUR-NAME.workers.dev` (same address, `wss://` instead of `https://`). Commit and push.
+4. Check `https://island-relay.YOUR-NAME.workers.dev/health` says `ok`.
+5. Recommended: in `worker/wrangler.toml` set `ALLOWED_ORIGINS = "https://YOUR-NAME.github.io"` and run `npx wrangler deploy` again, so other websites can't use your relay.
+
+**Meeting a friend:** both open the page, press 🌐, and you're in room `main`. For a private room, share a link like `https://your.site/?room=our-room` (letters, numbers and dashes, up to 24 characters).
+
+Limits (in `worker/src/room.js`): 40 people per room, about 15 position updates per second and one chat line every 2 seconds per person, 80 characters per line. Chat text is cleaned on the server and shown as plain text in the page.
+
+If `js/config.js` has no address, 🌐 falls back to serverless peer-to-peer (Trystero), which often fails between different networks and shows other visitors your IP address. To test locally: `cd worker && npx wrangler dev`, then in the browser console `localStorage.setItem('island.relay','ws://127.0.0.1:8787')` and reload.
+
 ## Cache
 
 - Your buddy is saved the first time you pick one; later visits skip the picker (change it any time in ☰).

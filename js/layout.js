@@ -61,17 +61,28 @@ export function createLayout({ seed = 1, links = 3, projects = 3 } = {}) {
 
   // ---- 2. stations on arcs behind the plaza (north = -z). Capacity per ring comes from spacing, extra items spill outward.
   const NORTH = -Math.PI / 2;
-  function arcSlots(n, r0, gap, maxSpan) {
+  function arcSlots(n, r0, gap, maxSpan, da = 0) {
     const pts = [], step = gap / r0, per = Math.max(1, Math.floor(maxSpan / step) + 1);
     for (let i = 0, ring = 0; i < n; ring++) {
       const m = Math.min(per, n - i), r = r0 + ring * gap;
-      for (let j = 0; j < m; j++, i++) pts.push({ r, a: NORTH + (j - (m - 1) / 2) * (gap / r), ring });
+      for (let j = 0; j < m; j++, i++) pts.push({ r, a: NORTH + da + (j - (m - 1) / 2) * (gap / r), ring });
     }
     return pts;
   }
-  const projSlots = arcSlots(projects, 6.2, 3.4, 1.9);
+  const gapP = projects <= 4 ? 3.8 : 3.4, gapL = links <= 4 ? 5 : 4.4; // roomy while there is space, tight when the island fills up
+  const projSlots = arcSlots(projects, 6.2, gapP, 1.9);
   const linkR = Math.min(11, Math.max(10.2, Math.max(0, ...projSlots.map(s => s.r)) + 4));
-  const linkSlots = arcSlots(links, linkR, 4.4, 2.1);
+  // The camera looks north, so a far sign directly behind a near one hides it. Shift the link arc sideways to the offset
+  // where every link sits furthest (sideways) from every project, but still inside the island and near the centre line.
+  const sideX = s => Math.cos(s.a) * s.r, projX = projSlots.map(sideX);
+  let linkSlots = arcSlots(links, linkR, gapL, 2.1), linkScore = -1e9;
+  for (let i = -12; i <= 12; i++) {
+    const cand = arcSlots(links, linkR, gapL, 2.1, i * .03);
+    if (cand.some(s => Math.hypot(s.r * Math.cos(s.a), s.r * Math.sin(s.a)) > 11.2)) continue;
+    const gapX = Math.min(...cand.flatMap(c => projX.map(px => Math.abs(sideX(c) - px))), 9);
+    const sc = Math.min(gapX, 2.6) * 3 - Math.abs(i) * .05;
+    if (sc > linkScore) { linkScore = sc; linkSlots = cand; }
+  }
   const place = (slot, kind, idx) => {
     let [x, z] = polar(slot.r, slot.a);
     if (Math.hypot(x, z) > 11.4) { const q = best({ gen: inRing(4, 11.2), r: 1.5, margin: .4, k: 60 }); if (q) { x = q.x; z = q.z; } }
