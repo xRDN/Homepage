@@ -21,6 +21,7 @@ h2{font-size:1.4rem;margin-bottom:1rem}
 .picks{display:flex;gap:.9rem;justify-content:center;margin-bottom:1.4rem;flex-wrap:wrap}
 .pick{font:inherit;font-weight:800;color:var(--ink);background:#fff;border:3px solid transparent;border-radius:28px;padding:1rem 1.1rem;cursor:pointer;display:grid;gap:.3rem;transition:transform .2s cubic-bezier(.34,1.56,.64,1)}
 .pick b{font-size:2.2rem}
+.pick small{font-weight:600;font-size:.72rem;opacity:.7;max-width:8.5rem;line-height:1.25}
 .pick:hover{transform:scale(1.06)}
 .pick.on{border-color:var(--leaf);background:#eef7ea;transform:scale(1.08)}
 
@@ -124,3 +125,11 @@ h2{font-size:1.4rem;margin-bottom:1rem}
 @keyframes beat{50%{transform:scale(1.22)}}
 .ico.pulse{animation:beat 1.1s 4}
 @media (prefers-reduced-motion:reduce){.ico.pulse{animation:none}}
+/* six buddies: a compact grid that always fits, scrolls if the screen is tiny */
+#pick .card,#chars .sheet{max-height:calc(100dvh - 2rem);overflow-y:auto}
+#pick .card{max-width:34rem;padding:1.6rem 1.4rem}
+.picks{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.7rem}
+.pick{padding:.7rem .5rem;border-radius:22px;justify-items:center}
+.pick b{font-size:1.9rem}
+.pick:hover,.pick.on{transform:scale(1.04)}
+@media (max-width:480px){.picks{grid-template-columns:repeat(2,minmax(0,1fr))}.pick small{font-size:.68rem}}

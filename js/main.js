@@ -289,9 +289,11 @@ const fireLight = new THREE.PointLight(0xff9a4a, 0, 9, 2);
 if (fires[0]) { fireLight.position.set(fires[0].x, .9, fires[0].z); scene.add(fireLight); }
 
 // clouds, golden acorns, shooting stars, rainbow
-const got = new Set(jget('island.acorns', []));
+// found acorns are remembered per island: if the island is re-rolled or its layout changes, the old finds no longer apply
+const acornKey = L.acorns.map(p => p.x.toFixed(1) + ',' + p.z.toFixed(1)).join(';');
+const gotSaved = jget('island.acorns', null);
+const got = new Set(gotSaved && !Array.isArray(gotSaved) && gotSaved.k === acornKey ? gotSaved.ids : []);
 // ---- haunted island: the 5th golden acorn unlocks it, 👻 toggles it, both are remembered ----
-if (got.size >= 5 && !prefs.horrorUnlocked) { prefs.horrorUnlocked = true; prefs.horrorOn = false; savePrefs(); } // found them all before this update
 let horrorT = prefs.horrorUnlocked && prefs.horrorOn ? 1 : 0, horror = horrorT; // horror eases toward horrorT; starts settled so a reload does not fade in
 const HBG = new THREE.Color(0x1a0b10), HHEM = new THREE.Color(0x5a2a3a), HGND = new THREE.Color(0x1a0a10), HSUN = new THREE.Color(0xb02a2a), HCOL = new THREE.Color(0x2b2230), HWATER = new THREE.Color(0x1b1020), HCLOUD = new THREE.Color(0x2a1418), HRED = new THREE.Color(0xff3a2a), HLAMP = new THREE.Color(0xff3a1a), HFIRE = new THREE.Color(0xff3a1a);
 const vigEl = $('#vig');
@@ -421,11 +423,24 @@ const KINDS = {
   slime: { k: 's', c: 0x4fc4b0 },
   mochi: { k: 's', c: 0xffa6c9, ears: 1, blush: 0xf0568f },
   bot:   { k: 'b', c: 0xe8eef2, glow: 0x6ff3ff },
-  pip:   { k: 'b', c: 0xffc2d9, glow: 0xff7fb0 },
+  pip:   { k: 'b', c: 0xffc2d9, glow: 0xff7fb0, bow: 1 },           // Pip: not pickable
+  momo:  { k: 's', c: 0xcdbcf5, blush: 0xb98be0, lids: 1, cap: 1 }, // Momo: not pickable
+  ember: { k: 's', c: 0xff9a5c, blush: 0xff5a4a, crest: 'flame' },
+  frost: { k: 's', c: 0xa9dcff, blush: 0x7fb6f0, crest: 'snow' },
+  cloud: { k: 's', c: 0xf3f7ff, blush: 0xffb3c8, crest: 'puff' },
 };
-const CHARS = [['slime', '🫧', 'Blobby'], ['mochi', '🍡', 'Mochi'], ['bot', '🤖', 'Bunbot']];
+// Only these can be chosen (and only these are accepted from other visitors). Pip and Momo are the island's own.
+const CHARS = [
+  ['slime', '🫧', 'Blobby', 'Bouncy and curious', 'Boing! Where to first?'],
+  ['mochi', '🍡', 'Mochi', 'Soft, shy, secretly brave', 'hi… i brought snacks'],
+  ['bot', '🤖', 'Bunbot', 'Tidy and a bit too logical', 'Systems nominal. Hello!'],
+  ['ember', '🔥', 'Ember', 'Warm, loud, loves campfires', 'Who wants to sit by the fire?'],
+  ['frost', '❄️', 'Frost', 'Cool, calm, collects snowflakes', 'Nice and chilly out.'],
+  ['cloud', '☁️', 'Puff', 'Floaty daydreamer', 'oh! a whole island…'],
+];
+const CHAR_IDS = CHARS.map(c => c[0]);
 function build(type) {
-  const K = KINDS[type], core = new THREE.Group(), hands = [];
+  const K = KINDS[type], core = new THREE.Group(), hands = [], ears = [];
   const eyeM = M(0x2d2140, .3), shine = new THREE.MeshBasicMaterial({ color: 0xffffff }), blush = M(K.blush || 0xff9ec0, .9);
   const eyes = (y, z, sp, cx, cy, cz, em) => {
     for (const s of [-1, 1]) {
@@ -438,8 +453,20 @@ function build(type) {
     mk(sph(.55, 32, 24), M(K.c, .25), [0, .48, 0], core).scale.set(1.05, .88, 1.05);
     eyes(.52, .55, .18, .32, .38, .47);
     mk(new THREE.TorusGeometry(.05, .014, 8, 16, Math.PI), eyeM, [0, .43, .56], core).rotation.z = Math.PI;
-    if (K.ears) {
+    if (K.lids) for (const s of [-1, 1]) mk(sph(.098, 14, 10), M(K.c, .3), [s * .18, .565, .545], core).scale.set(1, .52, .8); // heavy sleepy lids
+    if (K.cap) { // Momo's floppy nightcap
+      const cap = mk(new THREE.ConeGeometry(.34, .7, 16), M(0x5b4b9a, .6), [.12, 1.12, 0], core); cap.rotation.z = -.55;
+      mk(sph(.1, 10, 8), M(0xfff5e0, .8), [.42, 1.38, 0], core);
+      mk(new THREE.TorusGeometry(.33, .05, 8, 24), M(0xfff5e0, .8), [0, .86, 0], core).rotation.x = Math.PI / 2;
+    } else if (K.ears) {
       for (const s of [-1, 1]) { const e = mk(new THREE.ConeGeometry(.15, .32, 16), M(K.c, .4), [s * .3, .98, 0], core); e.rotation.z = -s * .35; }
+    } else if (K.crest === 'flame') {
+      [[-.14, .06, .2], [0, .0, .3], [.14, .06, .2]].forEach(([x, z, h], i) => mk(new THREE.ConeGeometry(.1, .3 + h, 8), new THREE.MeshStandardMaterial({ color: i === 1 ? 0xffd04a : 0xff7a2a, emissive: i === 1 ? 0xffb020 : 0xff5a10, emissiveIntensity: .8 }), [x, .98 + h * .3, z], core));
+    } else if (K.crest === 'snow') {
+      const capM = M(0xffffff, .5); mk(sph(.34, 16, 10), capM, [0, .9, 0], core).scale.set(1, .5, 1);
+      mk(new THREE.ConeGeometry(.05, .2, 6), M(0xd8f0ff, .2), [.2, .78, .25], core).rotation.x = Math.PI;
+    } else if (K.crest === 'puff') {
+      [[-.2, .96, 0, .2], [.02, 1.04, .02, .26], [.24, .94, 0, .18]].forEach(([x, y, z, r]) => mk(sph(r, 12, 10), M(0xffffff, .7), [x, y, z], core));
     } else {
       const leaf = mk(sph(.16, 12, 10), M(0x8fe08a), [.06, 1.0, 0], core);
       leaf.scale.set(1, .45, .6); leaf.rotation.z = -.5;
@@ -451,14 +478,15 @@ function build(type) {
     const glow = new THREE.MeshStandardMaterial({ color: K.glow, emissive: K.glow, emissiveIntensity: 1.2 });
     eyes(.58, .56, .15, .27, .48, .49, glow);
     mk(new THREE.TorusGeometry(.05, .014, 8, 16, Math.PI), glow, [0, .5, .55], core).rotation.z = Math.PI;
+    if (K.bow) { const bm = M(0xffd24a, .5); for (const s of [-1, 1]) mk(new THREE.ConeGeometry(.1, .2, 8), bm, [.34 + s * .12, 1.0, .1], core).rotation.z = s * Math.PI / 2; mk(sph(.06, 8, 8), bm, [.34, 1.0, .1], core); } // Pip's yellow bow
     for (const s of [-1, 1]) {
       const ear = mk(new THREE.CapsuleGeometry(.1, .4, 6, 12), white, [s * .22, 1.18, -.02], core);
-      ear.rotation.z = -s * .18;
+      ear.rotation.z = -s * .18; ears.push({ m: ear, s });
       mk(new THREE.CapsuleGeometry(.05, .28, 6, 8), blush, [0, 0, .07], ear);
       hands.push(mk(sph(.1, 14, 10), white, [s * .5, .35, .12], core));
     }
   }
-  return { core, hands };
+  return { core, hands, ears };
 }
 function makePlayer(type, name) {
   const o = { type, vy: 0, y: 0, land: 0, moving: false, mesh: new THREE.Group() };
@@ -499,18 +527,51 @@ function step(o, mx, mz, dt, sp = 5) {
   o.mesh.rotation.y += wrap(Math.atan2(mx, mz) - o.mesh.rotation.y) * (1 - Math.exp(-dt * 12));
   resolve(o);
 }
+// floating "Z"s while asleep: Pip's are small, neat and quick; Momo's are big, slow and wobbly
+const ZTEX = (() => { const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d'); g.font = '900 54px ui-rounded, system-ui, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.lineWidth = 7; g.strokeStyle = 'rgba(40,30,80,.55)'; g.fillStyle = '#fff'; g.strokeText('Z', 32, 34); g.fillText('Z', 32, 34); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t; })();
+const SLEEP = {
+  pip:  { period: 2.2, size: .2,  rise: .65, drift: .08, col: 0xcfe8ff, at: [.1, 1.15] },
+  momo: { period: 4.2, size: .34, rise: 1.05, drift: .22, col: 0xdccfff, at: [.2, .95] },
+};
+function sleepFx(o, t) {
+  const S = SLEEP[o.type]; if (!S) return;
+  if (!o.zs) o.zs = [0, 1, 2].map(() => { const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: ZTEX, color: S.col, transparent: true, opacity: 0, depthWrite: false })); sp.visible = false; o.mesh.add(sp); return sp; });
+  o.zs.forEach((sp, i) => {
+    sp.visible = o.sl > .05; if (!sp.visible) return;
+    const u = (t / S.period + i / 3) % 1;
+    sp.position.set(S.at[0] + Math.sin(u * 6.28 + i) * S.drift + u * .15, S.at[1] + u * S.rise, 0);
+    sp.material.opacity = o.sl * Math.sin(Math.PI * u) * .95; sp.scale.setScalar(S.size * (.55 + u * .75));
+  });
+}
 function animate(o, dt, t) {
   o.vy -= 32 * dt; o.y += o.vy * dt;
   if (o.y <= 0) { if (o.vy < -4) o.land = .28; o.y = 0; o.vy = 0; }
   const air = o.y > .001, bot = KINDS[o.type].k === 'b';
   const hop = !air && o.moving ? Math.abs(Math.sin(t * 10)) * (bot ? .08 : .22) : 0;
   o.land *= Math.exp(-dt * 9);
-  o.sl = (o.sl || 0) + ((o.sleep ? 1 : 0) - (o.sl || 0)) * Math.min(1, dt * 3); // asleep: sink into a slow-breathing loaf
-  const s = (air ? 1 + Math.min(Math.abs(o.vy) * .018, .25) : 1 - o.land + Math.sin(t * 3) * .015) * (1 - .38 * o.sl) + Math.sin(t * 1.6) * .025 * o.sl;
+  o.sl = (o.sl || 0) + ((o.sleep ? 1 : 0) - (o.sl || 0)) * Math.min(1, dt * (o.type === 'momo' ? 1.6 : 2.6)); // Momo takes her time to flop down; Pip is quick and neat
+  const sl = o.sl, momo = o.type === 'momo', pip = o.type === 'pip';
+  let s = air ? 1 + Math.min(Math.abs(o.vy) * .018, .25) : 1 - o.land + Math.sin(t * 3) * .015 * (1 - sl);
+  if (sl > .001) {
+    if (pip) s = s * (1 - .3 * sl) + Math.sin(t * 2.6) * .018 * sl;         // sits up in a tidy loaf, quick shallow breaths
+    else if (momo) s = s * (1 - .12 * sl) + Math.sin(t * 1.0) * .045 * sl; // slow, deep, sprawled breaths
+    else s = s * (1 - .38 * sl) + Math.sin(t * 1.6) * .025 * sl;
+  }
   if (o.emo > 0) { o.emo -= dt; o.core.rotation.y += dt * 9; } else o.core.rotation.y = 0;
-  o.core.position.y = o.y + hop + (o.emo > 0 ? Math.abs(Math.sin(t * 9)) * .3 : 0) + (bot ? Math.sin(t * 3) * .04 : 0);
+  let cx = 0, cy = o.y + hop + (o.emo > 0 ? Math.abs(Math.sin(t * 9)) * .3 : 0) + (bot ? Math.sin(t * 3) * .04 * (1 - sl) : 0), rx = 0, rz = 0;
+  if (sl > .001) {
+    if (momo) { // flops onto her side, curls up, and sometimes twitches in a dream
+      const a = sl * 1.42; rz = a; cx = .48 * Math.sin(a); cy += .48 * (1 - Math.cos(a)) - .05 * sl;
+      rx = Math.sin(t * .5) * .05 * sl; if (Math.sin(t * .37) > .96) o.core.rotation.y = Math.sin(t * 40) * .12 * sl;
+    } else if (pip) { // dozes sitting up: head droops, jerks awake, droops again
+      const ph = (t * .27) % 1, nod = ph < .86 ? ph / .86 : (1 - ph) / .14; rx = (.12 + .34 * nod) * sl;
+    }
+  }
+  o.core.position.set(cx, cy, 0); o.core.rotation.x = rx; o.core.rotation.z = rz;
   o.core.scale.set(1 / Math.sqrt(s), s, 1 / Math.sqrt(s));
-  o.hands.forEach((h, i) => { h.position.z = .12 + (o.moving ? Math.sin(t * 10 + i * Math.PI) * .15 : 0); });
+  o.hands.forEach((h, i) => { h.position.z = .12 + (o.moving ? Math.sin(t * 10 + i * Math.PI) * .15 : 0) + (pip ? -.1 * sl : 0); });
+  o.ears?.forEach(({ m, s: sd }) => { m.rotation.z = -sd * (.18 + (pip ? 1.0 : .5) * sl); m.rotation.x = sl * .5 + (pip ? Math.sin(t * 2.6) * .03 * sl : 0); }); // ears flop when asleep
+  if (sl > .001 || o.zs) sleepFx(o, t);
 }
 const tmp = new V();
 function place(o) {
@@ -524,12 +585,13 @@ const netBtn = $('#b-net');
 let netManual = false;
 const netOffTitle = () => net.relay ? 'Go online and meet other visitors' : 'Go online (peer-to-peer: other visitors can see your IP address)';
 const net = createNet({
-  make: (t, n) => makePlayer(KINDS[t] ? t : 'slime', n), retype: (o, t) => KINDS[t] && setType(o, t),
+  make: (t, n) => makePlayer(CHAR_IDS.includes(t) ? t : 'slime', n), retype: (o, t) => CHAR_IDS.includes(t) && setType(o, t),
   say, drop: dropPlayer,
   count: n => { netBtn.innerHTML = `🌐<small>${n + 1}</small>`; netBtn.classList.add('on'); },
   status: s => {
     if (s === 'connecting') { netBtn.innerHTML = '🌐<small>…</small>'; netBtn.title = 'Connecting…'; }
     else if (s === 'online') {
+      netBtn.innerHTML = '🌐<small>1</small>'; netBtn.classList.add('on');
       netBtn.title = `Online in room “${net.room}” (7 max) · tap to go offline`;
       if (netManual || !prefs.onlineSeen) { toast(prefs.onlineSeen ? `🌐 Online · room “${net.room}”` : '🌐 Online · others can see you · tap 🌐 in ⚙️ to go offline'); prefs.onlineSeen = true; savePrefs(); }
       else if (netBtn.dataset.was === 'retry') toast('🌐 Back online');
@@ -559,8 +621,9 @@ const netSay = v => { // public rooms carry emotes only; the first blocked sente
 };
 
 // ---- Pip and Momo: world chat, personalities, weather-aware behaviour ----
-let state = 'intro', sel = prefs.avatar || 'slime', me, nextHop = 0, nearby = null, pondNear = false;
+let state = 'intro', sel = CHAR_IDS.includes(prefs.avatar) ? prefs.avatar : 'slime', me, nextHop = 0, nearby = null, pondNear = false;
 const npcs = [];
+if (location.hash.includes('debug')) window.__island = { npcs, shelters, acorns, get me() { return me; } };
 const where = k => {
   const s = shelters.find(x => x.k === k); if (!s || !me) return '';
   const p = me.mesh.position, dx = s.cx - p.x, dz = s.cz - p.z, f = -dx * Math.sin(yaw) - dz * Math.cos(yaw), r = dx * Math.cos(yaw) - dz * Math.sin(yaw);
@@ -610,7 +673,7 @@ function npcTick(n, dt) {
     else {
       o.moving = false; o.mesh.rotation.y += wrap(lt.rot - o.mesh.rotation.y) * (1 - Math.exp(-dt * 4));
       if (!o.sleep) { o.sleep = true; n.z = rand(1.5, 3); }
-      if ((n.z -= dt) <= 0) { say(o, '💤', 2200); n.z = rand(5, 7); }
+      if ((n.z -= dt) <= 0) { say(o, n.who === 'pip' ? '💤' : 'zzz…', 2200); n.z = rand(14, 22); }
     }
     n.t = 0; return;
   }
@@ -660,7 +723,7 @@ function handleChat(v) {
 }
 
 // ---- flow ----
-const picksHTML = CHARS.map(([t, e, n]) => `<button class="pick" data-t="${t}"><b>${e}</b>${n}</button>`).join('');
+const picksHTML = CHARS.map(([t, e, n, tag]) => `<button class="pick" data-t="${t}"><b>${e}</b>${n}<small>${tag}</small></button>`).join('');
 $('#picks').innerHTML = $('#picks2').innerHTML = picksHTML;
 const syncPicks = () => document.querySelectorAll('.pick').forEach(x => x.classList.toggle('on', x.dataset.t === sel));
 document.querySelectorAll('.pick').forEach(b => b.onclick = () => {
@@ -668,18 +731,19 @@ document.querySelectorAll('.pick').forEach(b => b.onclick = () => {
   if (b.closest('#chars')) { prefs.avatar = sel; savePrefs(); closePanel(); toast(`${b.firstElementChild.textContent} Saved for next time`); }
 });
 if (net.relay && prefs.online !== false) $('#net-note').textContent = '🌐 Other visitors can see your buddy. Turn that off anytime with 🌐 in ⚙️.';
-if (prefs.avatar) { const c = CHARS.find(x => x[0] === prefs.avatar); if (c) $('#again').textContent = `Welcome back · playing as ${c[1]} ${c[2]} (change in ☰)`; }
+if (prefs.avatar) { const c = CHARS.find(x => x[0] === prefs.avatar); if (!c) delete prefs.avatar; if (c) $('#again').textContent = `Welcome back · playing as ${c[1]} ${c[2]} (change in ☰)`; }
 function beginPlay() {
   state = 'play'; $('#pick').classList.add('hidden'); $('#hud').classList.remove('hidden'); $('#b-menu').classList.remove('hidden');
   prefs.avatar = sel; savePrefs(); if (location.hash.includes('projects')) setTimeout(() => openPanel(), 900);
   me.mesh.position.set(0, 0, 0); me.mesh.rotation.y = Math.PI;
-  [['pip', 'pip', 'Pip'], ['mochi', 'momo', 'Momo']].forEach(([t, who, name], i) => {
+  [['pip', 'pip', 'Pip'], ['momo', 'momo', 'Momo']].forEach(([t, who, name], i) => {
     const o = makePlayer(t, name), q = who === 'pip' ? freeSpot(3.5, 2, 1.5) : freeSpot(POND.x + 3, POND.z, 1.5);
     o.mesh.position.copy(q); npcs.push({ o, who, goal: q.clone(), t: rand(1, 4), mode: 'wander', hold: 0, busy: false, near: false });
     setTimeout(() => say(o, NPC_LINES[i]), 1500 + i * 1200);
   });
   if (prefs.horrorUnlocked) { hb.classList.remove('hidden'); hb.classList.toggle('on', horrorT === 1); hb.setAttribute('aria-pressed', horrorT === 1); if (horrorT === 1) haunt(true); }
   if (net.relay && prefs.online !== false) goOnline(false); // online by default; a quiet failure just leaves 🌐 off
+  { const c = CHARS.find(x => x[0] === sel); if (c) setTimeout(() => say(me, c[4]), 700); } // each buddy greets in its own voice
   if (coarse) toast('👈 left side moves · right side looks 👉', '#7fb0d6');
   setTimeout(() => toast('💬 Tip: type @Pip or @Momo to talk to them', '#7fb0d6'), 2500);
 }
@@ -970,7 +1034,7 @@ renderer.setAnimationLoop(() => {
       chipT = .4;
       const aur = aurora > .5, icon = aur ? '🌌' : wx === 'clear' && night ? '🌙' : WX_ICON[wx], name = aur ? 'Aurora' : WX_NAME[wx];
       const bad = fx.rain > .2 || snowA > .2 || fx.wind > .6 || fx.heat > .5;
-      const s = horror > .5 ? `🕯️ Haunted · ${currentTemp()}°` : `${icon} ${name} · ${currentTemp()}°${inShelter && bad ? ' · 🏠 Sheltered' : ''}${warmth && cold ? ' · 🔥 Warm' : ''}`;
+      const s = (horror > .5 ? `🕯️ Haunted · ${currentTemp()}°` : `${icon} ${name} · ${currentTemp()}°${inShelter && bad ? ' · 🏠 Sheltered' : ''}${warmth && cold ? ' · 🔥 Warm' : ''}`) + (net.on() && netBtn.classList.contains('on') ? ` · 🌐 ${net.list().length + 1}` : '');
       if (s !== lastChip) $('#wx').textContent = lastChip = s;
     }
   }
@@ -1037,12 +1101,12 @@ function worldFx(dt, t) {
   acorns.forEach((g, i) => {
     g.rotation.y += dt * 2; g.position.y = .5 + Math.sin(t * 2.5 + i) * .1;
     if (g.visible && Math.hypot(me.mesh.position.x - g.position.x, me.mesh.position.z - g.position.z) < 1.3) {
-      g.visible = false; got.add(i); ls.set('island.acorns', JSON.stringify([...got]));
+      g.visible = false; got.add(i); ls.set('island.acorns', JSON.stringify({ k: acornKey, ids: [...got] }));
       sound.chime(); toast(`🌰 Golden acorn ${got.size}/5`, '#f0b030');
       if (got.size === 5) { // no crown: the fifth acorn wakes something on the island
         prefs.horrorUnlocked = true; savePrefs(); hb.classList.remove('hidden'); hb.classList.add('pulse');
         toast('🌰 All five found… the sky feels wrong', '#f0b030');
-        setTimeout(() => { setHorror(true, true); flash = reduce ? .3 : .8; sound.thunder(.5); toast('👻 The island is haunted now. Toggle it anytime with 👻 (top right)', '#c0392b'); }, 1400);
+        setTimeout(() => { sound.creak(); toast('👻 Something stirs… a ghost button appeared (top right). Press it if you dare.', '#c0392b'); }, 1600); // unlocked, not started: you choose when
       }
     }
   });
