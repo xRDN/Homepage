@@ -148,6 +148,13 @@
 </aside>
 
 <script type="module" src="./js/main.js"></script>
-<script>setTimeout(() => { if (document.body.classList.contains('ready')) return; const g = document.getElementById('go'); if (!g) return; g.disabled = false; g.textContent = 'Still loading… tap to retry'; g.onclick = () => location.reload(); }, 20000)</script>
+<div id="wait" aria-live="polite">Loading island…</div>
+<script>setTimeout(() => { // after 3 s of loading, offer to skip the wait; "Come on in" still appears by itself when ready
+  if (document.body.classList.contains('ready')) return;
+  const g = document.getElementById('go'); if (!g || document.getElementById('skip')) return;
+  const b = document.createElement('button'); b.id = 'skip'; b.className = 'btn alt'; b.textContent = 'Skip loading';
+  b.onclick = () => { window.__enter = true; document.getElementById('intro').classList.add('hidden'); document.getElementById('wait').classList.add('on'); }; // go straight in the moment the island is ready
+  g.after(b);
+}, 3000)</script>
 </body>
 </html>

@@ -179,3 +179,8 @@ body.ready #webgl{opacity:1}
 @media (prefers-reduced-motion:reduce){#boot .isle,#go[disabled]{animation:none}}
 body:not(.ready) #mood{opacity:0;pointer-events:none}
 .name.pet{font-size:.62rem;opacity:.85}
+
+#skip{display:block;margin:.9rem auto 0;padding:.5rem 1.3rem;font-size:.85rem;animation:pop .4s both}
+#wait{display:none;position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 2rem);transform:translateX(-50%);z-index:31;padding:.6rem 1.3rem;border-radius:99px;background:rgba(255,248,240,.9);border:3px solid #fff;font-weight:800;font-size:.9rem;box-shadow:0 5px 0 rgba(60,110,90,.3)}
+#wait.on{display:block}
+body.ready #skip,body.ready #wait{display:none}

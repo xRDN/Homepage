@@ -1311,7 +1311,7 @@ renderer.setAnimationLoop(() => {
   for (const o of pets.list) if (state !== 'intro') place(o);
   for (const o of [me, ...npcs.map(n => n.o), ...net.list()]) if (o) { animate(o, dt, t); if (state !== 'intro') place(o); }
   renderer.render(scene, camera);
-  if (!booted) { booted = true; requestAnimationFrame(() => { document.body.classList.add('ready'); const g = $('#go'); g.disabled = false; g.textContent = 'Come on in'; }); } // first frame is on screen
+  if (!booted) { booted = true; requestAnimationFrame(() => { document.body.classList.add('ready'); const g = $('#go'); g.disabled = false; g.textContent = 'Come on in'; if (window.__enter) { window.__enter = false; g.click(); } }); } // first frame is on screen
   if (snap) { snap = false; takePhoto(); }
 });
 // haunted mode: vignette, the Watcher, heartbeat, creaks
