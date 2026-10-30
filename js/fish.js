@@ -41,7 +41,7 @@ export function buildFish(sp) {
   return g;
 }
 
-export function createFishing({ scene, pond, toast, sound }) {
+export function createFishing({ scene, pond, toast, sound, onCatch }) {
   const dex = JSON.parse(localStorage.getItem('island.dex') || '{}');
   const swimmers = [];
   for (let i = 0; i < 5; i++) {
@@ -50,18 +50,18 @@ export function createFishing({ scene, pond, toast, sound }) {
   }
   const bob = new THREE.Mesh(new THREE.SphereGeometry(.13, 12, 10), new THREE.MeshStandardMaterial({ color: 0xe8554e }));
   bob.visible = false; scene.add(bob);
-  let st = 'idle', timer = 0, leap = null;
+  let st = 'idle', timer = 0, leap = null, casts = 0;
   const cond = { bite: 1, luck: 1, swim: 1, blocked: '' }; // set every frame by the weather
   const idle = () => { st = 'idle'; bob.visible = false; };
   return {
-    dex, active: () => st !== 'idle', cancel: idle, setCond: c => Object.assign(cond, c),
+    dex, active: () => st !== 'idle', bobber: () => bob.visible ? bob.position : null, casts: () => casts, cancel: idle, setCond: c => Object.assign(cond, c),
     label: () => cond.blocked ? '🚫 ' + cond.blocked : st === 'bite' ? '❗ Reel in!' : st === 'wait' ? '🎣 Waiting…' : '🎣 Cast line',
     press() {
       if (cond.blocked && st === 'idle') return toast(cond.blocked, '#8fa39a');
       if (st === 'idle') {
         const a = rand(0, 6.28), r = rand(.5, 1.8);
         bob.position.set(pond.x + Math.cos(a) * r, .1, pond.z + Math.sin(a) * r); bob.visible = true;
-        st = 'wait'; timer = rand(1.5, 4.5) / Math.max(cond.bite, .2); sound.splash();
+        st = 'wait'; casts++; timer = rand(1.5, 4.5) / Math.max(cond.bite, .2); sound.splash();
       } else if (st === 'wait') { idle(); toast('Too early, it swam off 🐟', '#8fa39a'); }
       else {
         const sp = roll(cond.luck); dex[sp.id] = (dex[sp.id] || 0) + 1; localStorage.setItem('island.dex', JSON.stringify(dex));
@@ -70,6 +70,7 @@ export function createFishing({ scene, pond, toast, sound }) {
         const R = RAR[sp.r];
         toast(`${sp.e} ${sp.n} · ${sp.r} ${R.name}${sp.r === 'SSR' ? ' ✨' : ''}`, R.c);
         if (sp.r === 'SR' || sp.r === 'SSR') sound.chime();
+        onCatch?.(sp, bob.position);
       }
     },
     update(dt, t) {

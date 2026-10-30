@@ -6,6 +6,11 @@ import { initAI, BUDDIES, HORROR_LINES } from './ai.js';
 import { createFishing, renderDex } from './fish.js';
 import { createLayout } from './layout.js';
 import * as PR from './props.js';
+import { createSky } from './sky.js';
+import { createPets } from './pets.js';
+import { createAmbient } from './ambient.js';
+import { createFeel } from './feel.js';
+import { RELAY } from './config.js';
 
 // ---- edit me ----
 const LINKS = [
@@ -27,7 +32,7 @@ const WX_LINES = {
   },
   momo: {
     clear: ['sun. ugh. nice, I guess'], cloudy: ['perfect nap light'], windy: ['whee. my ears.'], rain: ['RAIN. puddles!!'], storm: ['too loud. gazebo.'],
-    snow: ['cold... fire?'], fog: ['cozy fog~'], heat: ['melting. mochi problems.'],
+    snow: ['cold... fire?'], fog: ['cozy fog~'], heat: ['melting. fur problems.'],
   },
 };
 // -----------------
@@ -42,13 +47,33 @@ const pick = a => a[Math.floor(Math.random() * a.length)];
 const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
 const wrap = a => Math.atan2(Math.sin(a), Math.cos(a));
 const EMO = ['👋', '💃', '❤️'];
-const toast = (msg, c = '#5aa469') => { const d = document.createElement('div'); d.className = 'toast'; d.textContent = msg; d.style.borderColor = c; $('#toasts').append(d); setTimeout(() => d.remove(), 3200); };
+const toast = (msg, c = '#5aa469') => {
+  const box = $('#toasts');
+  for (const o of box.children) if (o.dataset.m === msg) return; // already showing
+  while (box.children.length >= 3) box.firstElementChild.remove();
+  const m = msg.match(/^(\p{Extended_Pictographic}[\uFE0F\u200D\p{Extended_Pictographic}]*)\s*(.*)$/su);
+  const d = document.createElement('div'); d.className = 'toast'; d.dataset.m = msg; d.style.setProperty('--c', c);
+  const i = document.createElement('b'), t = document.createElement('span'); i.textContent = m ? m[1] : '•'; t.textContent = m ? m[2] : msg; d.append(i, t);
+  box.append(d); setTimeout(() => { d.classList.add('out'); setTimeout(() => d.remove(), 300); }, 2600 + msg.length * 35);
+};
 const sr = Object.assign(document.createElement('p'), { ariaLive: 'polite' }); sr.style.cssText = 'position:absolute;left:-9999px'; document.body.append(sr);
 
 // ---- cache: preferences, island layout, offline assets ----
 const ls = { get: k => { try { return localStorage.getItem(k); } catch { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch {} }, del: k => { try { localStorage.removeItem(k); } catch {} } };
 const jget = (k, d) => { try { return JSON.parse(ls.get(k)) ?? d; } catch { return d; } };
 const prefs = jget('island.prefs', {}), savePrefs = () => ls.set('island.prefs', JSON.stringify(prefs));
+// ---- anonymous stats: daily counters on the relay (worker/src/stats.js). No cookies, no IDs. Off with 📊 in ⚙️, DNT or GPC ----
+const STATS_URL = RELAY ? RELAY.replace(/^ws/, 'http').replace(/\/+$/, '') + '/hit' : '';
+const privacySignal = () => navigator.doNotTrack === '1' || window.doNotTrack === '1' || navigator.globalPrivacyControl === true;
+const statsOn = () => !!STATS_URL && prefs.stats !== false && !privacySignal();
+const tracked = new Set();
+function track(e, once = true) {
+  if (!statsOn() || (once && tracked.has(e))) return; tracked.add(e);
+  const body = JSON.stringify({ e: String(e).toLowerCase().slice(0, 41) });
+  try { if (!navigator.sendBeacon?.(STATS_URL, body)) fetch(STATS_URL, { method: 'POST', body, keepalive: true, mode: 'no-cors' }).catch(() => {}); } catch {}
+}
+track(prefs.avatar ? 'visit:return' : 'visit:new');
+const slug = v => String(v).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 24) || 'x';
 const chatStay = () => prefs.chatStay !== false; // default: the chat box stays after you send (📌 in ⚙️ turns that off)
 const lite = prefs.lite ?? (coarse && (navigator.hardwareConcurrency || 8) <= 4);
 if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}));
@@ -88,6 +113,22 @@ let night = (h => h < 6 || h >= 19)(new Date().getHours()), cold = false, wx = '
   wx = fit(wx, cold);
 }
 const key = () => (night ? 'n' : 'd') + (cold ? 'c' : 'w');
+// ---- sky events: rare, special skies. ✨ Auto lets them happen now and then; the 🌠 tile in ⚙️ picks one ----
+const SKY = {
+  sunset:  { icon: '🌇', name: 'Sunset', night: false, top: 0x3a3f86, hor: 0xff8a52, bot: 0x6a3f5c, hs: 0xffc2a8, hg: 0x6a4a5a, sun: 0xffa060, cloud: 0xffb39c, water: 0xd98c7c,
+             lines: { pip: 'Golden hour! Perfect light for a postcard 📸', momo: 'pretty. orange. sleepy.' } },
+  meteors: { icon: '☄️', name: 'Meteor shower', night: true, top: 0x040a1f, hor: 0x1c2a55, bot: 0x0d1430, hs: 0x8fa0e0, hg: 0x1c2238,
+             lines: { pip: 'A meteor shower! Quick, make a wish ☄️', momo: 'i wished for a nap. it came true.' } },
+  cosmic:  { icon: '🪐', name: 'Cosmic night', night: true, top: 0x06041a, hor: 0x2b1850, bot: 0x120a24, hs: 0x9a86e0, hg: 0x241838,
+             lines: { pip: 'Look up! Is that… a planet? 🪐', momo: 'the sky is doing a thing. i approve.' } },
+  aurora:  { icon: '🌌', name: 'Aurora', night: true, top: 0x03161c, hor: 0x0e3b48, bot: 0x08202a, hs: 0x7fe0c8, hg: 0x14303a,
+             lines: { pip: 'The aurora is out! 🌌', momo: 'ooh. sky curtains.' } },
+};
+for (const k in SKY) for (const c of ['top', 'hor', 'bot', 'hs', 'hg', 'sun', 'cloud', 'water']) if (SKY[k][c] != null) SKY[k][c] = new THREE.Color(SKY[k][c]);
+const SKY_ORDER = ['auto', 'sunset', 'meteors', 'cosmic', 'aurora', 'off'];
+let skyMode = SKY_ORDER.includes(prefs.sky) ? prefs.sky : 'auto', skyEvt = '', skyLeft = 0, skyNext = 0, lowSun = false;
+const skyW = { sunset: 0, meteors: 0, cosmic: 0, aurora: 0 };
+{ const w = location.hash.slice(1).toLowerCase().split(/[-,&+]/), k = Object.keys(SKY).find(x => w.includes(x)); if (k) { skyMode = k; night = SKY[k].night; } }
 const cur = { hi: PAL[key()].hi, si: PAL[key()].si };
 CK.forEach(k => cur[k] = new THREE.Color(PAL[key()][k]));
 const fx = { ...WX[wx] };                       // blended weather numbers, eased towards WX[wx]
@@ -97,14 +138,17 @@ const WD = { x: Math.cos(.6), z: Math.sin(.6) }; // wind blows towards +x/+z
 const currentTemp = () => live && temp != null ? temp : fakeTemp(wx, night, cold);
 
 const strip = $('#wxs');
-strip.innerHTML = WX_LIST.map(w => `<button class="ico" data-w="${w}" title="${WX_NAME[w]}" aria-label="${WX_NAME[w]} weather">${WX_ICON[w]}</button>`).join('');
+strip.innerHTML = WX_LIST.map(w => `<button class="ico" data-w="${w}" data-l="${WX_NAME[w].replace('Heatwave', 'Heat')}" title="${WX_NAME[w]}" aria-label="${WX_NAME[w]} weather">${WX_ICON[w]}</button>`).join('');
 let lastChip = '';
 function syncMood() {
+  $('#b-tod').dataset.l = night ? 'Night' : 'Day'; $('#b-temp').dataset.l = cold ? 'Cold' : 'Warm';
   $('#b-tod').textContent = night ? '🌙' : '☀️'; $('#b-tod').title = $('#b-tod').ariaLabel = night ? 'Night: tap for day (N)' : 'Day: tap for night (N)';
   $('#b-temp').textContent = cold ? '❄️' : '🔥'; $('#b-temp').title = $('#b-temp').ariaLabel = cold ? 'Cold: tap for warm (T)' : 'Warm: tap for cold (T)';
   $('#b-auto').classList.toggle('on', auto && !live); $('#b-live').classList.toggle('on', live);
   $('#b-live').title = live ? `Real weather near you · ${temp}° (tap to stop)` : 'Match your real local weather';
   strip.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.w === wx));
+  const sb = $('#b-sky'), E = SKY[skyMode]; sb.textContent = E ? E.icon : skyMode === 'auto' ? '✨' : '⛅'; sb.dataset.l = E ? E.name.split(' ')[0] : skyMode === 'auto' ? 'Skies' : 'No skies';
+  sb.classList.toggle('on', !!E); sb.title = sb.ariaLabel = `Special skies: ${E ? E.name : skyMode === 'auto' ? 'now and then' : 'off'} (tap to change)`;
 }
 const unlive = () => { live = false; temp = null; ls.del('island.live'); syncMood(); };
 function changed(prev) {
@@ -118,6 +162,38 @@ function setWeather(w, manual) {
   if (manual) { if (auto) { auto = false; prefs.auto = false; savePrefs(); toast('🔒 Weather locked · 🎲 lets it drift again', '#8fa39a'); } if (live) unlive(); }
   if (w === 'snow') cold = true; else if (w === 'heat') cold = false;
   wx = fit(w, cold); changed(prev);
+}
+// which special sky is wanted, and is it visible right now?
+const skyOpen = () => fx.cloud < .55 && fx.rain < .2 && fx.snow < .3 && fx.fogN > 25;
+function startSky(k, announce) {
+  skyEvt = k; skyLeft = rand(90, 170);
+  if (announce && state === 'play' && k) {
+    toast(`${SKY[k].icon} ${SKY[k].name}`, '#9a7fd6');
+    for (const n of npcs) if (n.mode === 'wander' && !n.o.sleep) setTimeout(() => state === 'play' && skyEvt === k && say(n.o, SKY[k].lines[n.who]), rand(1200, 3500));
+  }
+}
+function skyTick(dt) {
+  if (skyMode === 'auto') {
+    if (skyEvt) { if ((skyLeft -= dt) <= 0 || SKY[skyEvt].night !== night) { skyEvt = ''; skyNext = rand(70, 160); } }
+    else if ((skyNext -= dt) <= 0) {
+      skyNext = rand(70, 160);
+      if (skyOpen() && horrorT < .5 && Math.random() < (night ? .55 : .35)) startSky(night ? pick(cold ? ['meteors', 'cosmic', 'aurora', 'aurora'] : ['meteors', 'cosmic', 'aurora']) : 'sunset', true);
+    }
+  } else skyEvt = skyMode === 'off' ? '' : skyMode;
+  for (const k in skyW) skyW[k] += ((skyEvt === k && SKY[k].night === night && skyOpen() && horrorT < .5 ? 1 : 0) - skyW[k]) * (1 - Math.exp(-dt * .6));
+  const want = skyEvt === 'sunset' && !night; // a sunset needs the sun low on the horizon
+  if (want !== lowSun) { lowSun = want; phaseT += wrap((want ? .1 : night ? .45 + Math.PI : .45) - phaseT); }
+}
+function cycleSky() {
+  skyMode = SKY_ORDER[(SKY_ORDER.indexOf(skyMode) + 1) % SKY_ORDER.length]; prefs.sky = skyMode; savePrefs();
+  const E = SKY[skyMode];
+  if (E) {
+    if (E.night !== night) toggleTod();
+    if (!skyOpen()) setWeather('clear', true);
+    startSky(skyMode, false); track('sky:' + skyMode); toast(`${E.icon} ${E.name}${E.night ? '' : ' · the sun goes down slowly'}`, '#9a7fd6');
+    for (const n of npcs) if (!n.o.sleep && n.mode === 'wander') setTimeout(() => skyEvt === skyMode && say(n.o, E.lines[n.who]), rand(1500, 3500));
+  } else { skyEvt = ''; skyNext = rand(40, 90); toast(skyMode === 'auto' ? '✨ Special skies happen now and then' : '⛅ No special skies', '#9a7fd6'); }
+  syncMood();
 }
 const toggleTod = () => { if (live) unlive(); night = !night; phaseT += Math.PI; syncMood(); };
 const toggleTemp = () => {
@@ -153,7 +229,8 @@ scene.add(sun);
 const mk = (geo, mat, pos, parent = scene, shadow) => PR.mk(geo, mat, pos, parent, shadow);
 const tex = draw => { const c = document.createElement('canvas'); c.width = c.height = 256; draw(c.getContext('2d')); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t; };
 
-// ---- sun, moon, stars, aurora ----
+// ---- sky dome (gradient + special skies), sun, moon, stars, aurora ----
+const sky = createSky(scene, { lite });
 const body = (map, size) => { const s = new THREE.Sprite(new THREE.SpriteMaterial({ map, fog: false, transparent: true, depthWrite: false })); s.scale.setScalar(size); scene.add(s); return s; };
 const sunS = body(tex(g => {
   const r = g.createRadialGradient(128, 128, 0, 128, 128, 128);
@@ -172,12 +249,16 @@ const sg = [];
 for (let i = 0; i < 260; i++) { const a = rand(0, 6.283), e = rand(.05, 1.3); sg.push(Math.cos(a) * Math.cos(e) * 85, Math.sin(e) * 85, Math.sin(a) * Math.cos(e) * 85); }
 const dotTex = tex(g => { const r = g.createRadialGradient(128, 128, 0, 128, 128, 128); r.addColorStop(0, 'rgba(255,255,255,1)'); r.addColorStop(.45, 'rgba(255,255,255,.85)'); r.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = r; g.fillRect(0, 0, 256, 256); });
 const starM = new THREE.PointsMaterial({ color: 0xffffff, size: 1.8, map: dotTex, transparent: true, opacity: 0, fog: false, depthWrite: false });
-const stars = new THREE.Points(new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute(sg, 3)), starM); stars.frustumCulled = false; scene.add(stars);
+const cg = [], cc = [], CS = [[1, 1, 1], [.75, .85, 1], [1, .8, .9], [.8, 1, .95], [1, .92, .7]];
+for (let i = 0; i < (lite ? 400 : 900); i++) { const a = rand(0, 6.283), e = Math.asin(rand(.02, 1)); cg.push(Math.cos(a) * Math.cos(e) * 84, Math.sin(e) * 84, Math.sin(a) * Math.cos(e) * 84); cc.push(...pick(CS)); }
+const cstarM = new THREE.PointsMaterial({ size: 1.5, map: dotTex, vertexColors: true, transparent: true, opacity: 0, fog: false, depthWrite: false, sizeAttenuation: true });
+const cstars = new THREE.Points(new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute(cg, 3)).setAttribute('color', new THREE.Float32BufferAttribute(cc, 3)), cstarM); cstars.frustumCulled = false; cstars.renderOrder = -6;
+const stars = new THREE.Points(new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute(sg, 3)), starM); stars.frustumCulled = false; scene.add(stars, cstars); stars.renderOrder = -6;
 // aurora: a curved curtain in the north sky, only on clear, cold nights
 const auroraTex = tex(g => {
   for (let x = 0; x < 256; x += 2) {
     const h = 90 + Math.random() * 150, a = .35 + Math.random() * .65, gr = g.createLinearGradient(0, 256, 0, 256 - h);
-    gr.addColorStop(0, `rgba(80,255,170,${a})`); gr.addColorStop(.55, `rgba(60,200,220,${a * .6})`); gr.addColorStop(1, 'rgba(190,90,255,0)');
+    gr.addColorStop(0, 'rgba(80,255,170,0)'); gr.addColorStop(.08, `rgba(80,255,170,${a})`); gr.addColorStop(.55, `rgba(60,200,220,${a * .6})`); gr.addColorStop(1, 'rgba(190,90,255,0)');
     g.fillStyle = gr; g.fillRect(x, 256 - h, 2, h);
   }
 });
@@ -191,6 +272,7 @@ auroraM.position.set(0, 22, -70); auroraM.frustumCulled = false; scene.add(auror
 const N = lite ? 130 : 320, RN = lite ? 240 : 560, pa = new Float32Array(N * 3), seed = new Float32Array(N);
 for (let i = 0; i < N; i++) { pa[i * 3] = rand(-22, 22); pa[i * 3 + 1] = rand(.4, 14); pa[i * 3 + 2] = rand(-22, 22); seed[i] = rand(0, 6.28); }
 const pGeo = new THREE.BufferGeometry().setAttribute('position', new THREE.BufferAttribute(pa, 3));
+const HEART = 56, heartTo = new Float32Array(HEART * 3), hR = new V(); let heartT = 0, heartDone = false, heartWait = 40;
 const pMat = new THREE.PointsMaterial({ size: .16, map: dotTex, transparent: true, opacity: 0, depthWrite: false, color: 0xffffff });
 const parts = new THREE.Points(pGeo, pMat); parts.frustumCulled = false; scene.add(parts);
 const rh = new Float32Array(RN * 3), rl = new Float32Array(RN * 6);
@@ -239,7 +321,7 @@ const pondRipples = Array.from({ length: 6 }, (_, i) => {
 const loc = (s, lx, lz) => { const c = Math.cos(s.rot), n = Math.sin(s.rot); return { x: s.x + lx * c + lz * n, z: s.z - lx * n + lz * c }; };
 
 // props from the layout
-const swayList = [], flowers = [], fires = [], windmills = [], fence = [], puddles = [];
+const swayList = [], flowers = [], fires = [], windmills = [], fence = [], puddles = [], lampPos = [];
 for (const p of L.props) {
   let o;
   switch (p.k) {
@@ -248,7 +330,7 @@ for (const p of L.props) {
     case 'rock': o = PR.rock(p.s, p.m); obstacles.push([p.x, p.z, p.r]); break;
     case 'flower': o = PR.flower(p.c); flowers.push(o); break;
     case 'mushroom': o = PR.mushroom(p.c, p.s); break;
-    case 'lamp': o = PR.lamp(); obstacles.push([p.x, p.z, .18]); break;
+    case 'lamp': o = PR.lamp(); obstacles.push([p.x, p.z, .18]); lampPos.push({ x: p.x, z: p.z }); break;
     case 'bench': o = PR.bench(); obstacles.push([p.x, p.z, .6]); break;
     case 'crate': o = PR.crate(); obstacles.push([p.x, p.z, .32]); break;
     case 'barrel': o = PR.barrel(); obstacles.push([p.x, p.z, .3]); break;
@@ -268,6 +350,7 @@ for (let i = 1; i < fence.length; i++) {
   const r2 = PR.fenceRail(d); r2.position.set(r.position.x, .32, r.position.z); r2.rotation.y = r.rotation.y; scene.add(r2);
 }
 for (const pd of L.puddles) { const g = PR.puddle(pd.s); g.position.set(pd.x, 0, pd.z); scene.add(g); puddles.push(g); }
+const feel = createFeel({ scene, puddles, lamps: lampPos, dotTex, POND });
 
 // shelters: gazebo + lean-to. sheltered() decides who stays dry; posts and walls are solid, the front stays open.
 const shelters = L.shelters.map(s => {
@@ -294,7 +377,9 @@ const acornKey = L.acorns.map(p => p.x.toFixed(1) + ',' + p.z.toFixed(1)).join('
 const gotSaved = jget('island.acorns', null);
 const got = new Set(gotSaved && !Array.isArray(gotSaved) && gotSaved.k === acornKey ? gotSaved.ids : []);
 // ---- haunted island: the 5th golden acorn unlocks it, 👻 toggles it, both are remembered ----
-let horrorT = prefs.horrorUnlocked && prefs.horrorOn ? 1 : 0, horror = horrorT; // horror eases toward horrorT; starts settled so a reload does not fade in
+if ('horrorUnlocked' in prefs || (got.size < 5 && prefs.horrorOn)) { delete prefs.horrorUnlocked; if (got.size < 5) prefs.horrorOn = false; savePrefs(); } // older builds kept a sticky unlock
+const hauntOK = () => got.size >= 5;
+let horrorT = hauntOK() && prefs.horrorOn ? 1 : 0, horror = horrorT; // horror eases toward horrorT; starts settled so a reload does not fade in
 const HBG = new THREE.Color(0x1a0b10), HHEM = new THREE.Color(0x5a2a3a), HGND = new THREE.Color(0x1a0a10), HSUN = new THREE.Color(0xb02a2a), HCOL = new THREE.Color(0x2b2230), HWATER = new THREE.Color(0x1b1020), HCLOUD = new THREE.Color(0x2a1418), HRED = new THREE.Color(0xff3a2a), HLAMP = new THREE.Color(0xff3a1a), HFIRE = new THREE.Color(0xff3a1a);
 const vigEl = $('#vig');
 // the Watcher: a tall dark figure that only exists in haunted mode. It never moves while you look at it and never touches you.
@@ -310,9 +395,6 @@ const acorns = L.acorns.map((p, i) => {
   mk(sph(.18, 12, 10), M(0xf0b030, .3), [0, 0, 0], g); mk(sph(.13, 10, 8), M(0xb8862a, .6), [0, .14, 0], g).scale.y = .6;
   g.position.set(p.x, .5, p.z); g.visible = !got.has(i); scene.add(g); return g;
 });
-const meteor = new THREE.Sprite(new THREE.SpriteMaterial({ color: 0xffffff, fog: false, transparent: true, opacity: 0, depthWrite: false }));
-meteor.scale.setScalar(1.6); scene.add(meteor);
-let mt = -1; const mv = new V();
 const rb = new THREE.Group();
 ['#e0525a', '#f08a3c', '#f2c94c', '#6cc070', '#4aa3df', '#5a6fd0', '#9a6bd0'].forEach((c, i) => rb.add(new THREE.Mesh(new THREE.TorusGeometry(42 + i * 1.1, .55, 6, 64, Math.PI), new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0, fog: false, depthWrite: false }))));
 rb.position.set(14, -3, -62); scene.add(rb);
@@ -351,12 +433,13 @@ function boardTex() {
 }
 const B0 = L.stations[0], board = PR.signboard(boardTex());
 board.position.set(B0.x, 0, B0.z); scene.add(board);
+const ambient = createAmbient({ scene, POND, roof: { x: B0.x, y: 4.46, z: B0.z } });
 for (let x = -2.6; x < 2.7; x += 1.04) obstacles.push([B0.x + x, B0.z, .55]); // posts and board are one solid wall
 const stations = [{ label: 'Projects & links', emoji: '🪧', x: B0.x, z: B0.z, hw: B0.hw + .2, sign: board, hover: false }];
 
 // ---- fishing, postcard, settings ----
-const fishing = createFishing({ scene, pond: POND, toast, sound });
-const act = () => nearby ? open(nearby) : pondNear && fishing.press();
+const fishing = createFishing({ scene, pond: POND, toast, sound, onCatch: (sp, at) => { pets.caught(at); track('fish'); } });
+const act = () => nearby ? open(nearby) : petNear ? feedPet(petNear) : pondNear && fishing.press();
 let snap = false;
 function takePhoto() {
   const c = document.createElement('canvas'); c.width = canvas.width; c.height = canvas.height;
@@ -369,7 +452,7 @@ function takePhoto() {
     if (navigator.canShare && navigator.canShare({ files: [f] })) { try { await navigator.share({ files: [f] }); return; } catch {} }
     const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = f.name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
   });
-  toast('📸 Postcard saved');
+  toast('📸 Postcard saved'); if (!prefs.shareTip) { prefs.shareTip = true; savePrefs(); setTimeout(() => toast('🔗 Tip: 🔗 Share in ⚙️ copies a link to this exact sky', '#7fb0d6'), 1500); }
 }
 
 // popovers: ☰ menu and ⚙️ settings, one open at a time
@@ -381,7 +464,26 @@ $('#b-menu').onclick = e => { togglePop('menu'); e.currentTarget.blur(); };
 addEventListener('pointerdown', e => { for (const [p, b] of Object.values(POPS)) if (!p.classList.contains('hidden') && !p.contains(e.target) && !b.contains(e.target)) closePops(); }, true);
 
 const press = (id, fn) => { $(id).onclick = e => { fn(e); e.currentTarget.blur(); }; };
-press('#b-tod', toggleTod); press('#b-temp', toggleTemp);
+// ---- share this moment: a link that opens the island with the same time, weather and sky ----
+function shareLink() {
+  const tk = [night ? 'night' : 'day', wx];
+  if (cold && wx !== 'snow') tk.push('cold');
+  if (skyEvt && skyW[skyEvt] > .3) tk.push(skyEvt);
+  tk.push('shared');
+  return location.origin + location.pathname + location.search + '#' + tk.join('-');
+}
+async function shareMoment() {
+  const url = shareLink(), what = skyEvt && skyW[skyEvt] > .3 ? SKY[skyEvt].name.toLowerCase() : `${night ? 'night' : 'day'}, ${WX_NAME[wx].toLowerCase()}`;
+  track('share', false);
+  if (navigator.share && coarse) { try { await navigator.share({ title: "Erdian's little island", text: `Come see the island (${what}) 🏝️`, url }); return; } catch (e) { if (e && e.name === 'AbortError') return; } }
+  try { await navigator.clipboard.writeText(url); toast(`🔗 Link copied · opens a ${what} island`, '#7fb0d6'); }
+  catch { toast(`🔗 ${url}`, '#7fb0d6'); }
+}
+const syncStats = () => { const b = $('#b-stats'), sig = privacySignal(); b.classList.toggle('on', statsOn()); b.dataset.l = statsOn() ? 'Stats on' : 'Stats off'; b.title = b.ariaLabel = sig ? 'Anonymous stats are off: your browser asks sites not to track (Do Not Track / GPC)' : statsOn() ? 'Anonymous visit counts (no cookies, no IDs). Tap to opt out' : 'Anonymous stats are off. Tap to help with anonymous counts'; };
+press('#b-stats', () => { if (privacySignal()) return toast('📊 Your browser asks not to be tracked, so nothing is counted', '#8fa39a'); prefs.stats = !statsOn(); savePrefs(); syncStats(); toast(statsOn() ? '📊 Thanks! Only anonymous daily counts, nothing about you' : '📊 Stats off · nothing is sent', '#8fa39a'); });
+press('#b-share', shareMoment);
+syncStats();
+press('#b-tod', toggleTod); press('#b-temp', toggleTemp); press('#b-sky', cycleSky);
 press('#b-auto', () => { if (live) { unlive(); auto = true; } else auto = !auto; prefs.auto = auto; savePrefs(); toast(auto ? '🎲 Weather drifts by itself' : '🔒 Weather locked', '#8fa39a'); syncMood(); });
 press('#b-live', () => { live ? unlive() : goLive(); });
 strip.onclick = e => { const b = e.target.closest('button'); if (b) { setWeather(b.dataset.w, true); b.blur(); } };
@@ -401,13 +503,19 @@ let panelOpen = false, activePanel;
 const panel = $('#projects');
 $('#plist').innerHTML = PROJECTS.map(p => `<a class="proj" href="${p.url}" target="_blank" rel="noopener"><b>${p.emoji}</b><div><h3>${p.name}</h3><p>${p.desc}</p>${p.tags.map(t => `<i>${t}</i>`).join('')}</div><em>↗</em></a>`).join('');
 let chatWas = false;
-function openPanel(el = panel) { closePops(); chatWas = !chat.classList.contains('hidden'); closeChat(); activePanel = el; panelOpen = true; el.classList.remove('hidden'); setTimeout(() => el.querySelector('.x').focus(), 60); }
+function openPanel(el = panel) { if (el === panel) track('board'); closePops(); chatWas = !chat.classList.contains('hidden'); closeChat(); activePanel = el; panelOpen = true; el.classList.remove('hidden'); setTimeout(() => el.querySelector('.x').focus(), 60); }
 function closePanel() { panelOpen = false; activePanel && activePanel.classList.add('hidden'); if (chatWas && chatStay()) { chat.classList.remove('hidden'); $('#b-chat').classList.add('on'); } chatWas = false; }
 [panel, $('#brain'), $('#dex'), $('#story-confirm'), $('#chars')].forEach(p => { p.querySelector('.x').onclick = closePanel; p.addEventListener('pointerdown', e => { if (e.target === p) closePanel(); }); });
 const open = () => { sound.chime(); openPanel(); };
 $('#clist').innerHTML = LINKS.map(l => `<a class="contact" style="background:${l.color}" href="${l.url}" target="_blank" rel="noopener"><b>${l.emoji}</b>${l.label}</a>`).join('');
+for (const el of ['#plist', '#clist', '#links']) $(el).addEventListener('click', e => { // which project or contact people actually open
+  const a = e.target.closest('a'); if (!a) return;
+  const pr = PROJECTS.find(p => p.url === a.getAttribute('href')), ln = LINKS.find(l => l.url === a.getAttribute('href'));
+  if (pr) track('project:' + slug(pr.name)); else if (ln) track('contact:' + slug(ln.label));
+});
 $('#links').innerHTML = LINKS.map(l => `<a href="${l.url}" target="_blank" rel="noopener">${l.emoji} ${l.label}</a>`).join('');
 $('#nav-proj').onclick = () => openPanel();
+$('#nav-tour').onclick = () => { closePops(); startTour(); };
 $('#nav-fish').onclick = () => { renderDex($('#dex-grid'), fishing.dex); openPanel($('#dex')); };
 $('#nav-chars').onclick = () => { syncPicks(); openPanel($('#chars')); };
 $('#nav-story').onclick = () => { $('#story-msg').textContent = ''; openPanel($('#story-confirm')); };
@@ -423,8 +531,8 @@ const KINDS = {
   slime: { k: 's', c: 0x4fc4b0 },
   mochi: { k: 's', c: 0xffa6c9, ears: 1, blush: 0xf0568f },
   bot:   { k: 'b', c: 0xe8eef2, glow: 0x6ff3ff },
-  pip:   { k: 'b', c: 0xffc2d9, glow: 0xff7fb0, bow: 1 },           // Pip: not pickable
-  momo:  { k: 's', c: 0xcdbcf5, blush: 0xb98be0, lids: 1, cap: 1 }, // Momo: not pickable
+  pip:   { k: 'p', c: 0xf4e9dc, suit: 0x2f4058, tie: 0xc8553d },    // Pip, the island guide: glasses, tie, clipboard (not pickable)
+  momo:  { k: 'b', c: 0xffc2d9, glow: 0xff7fb0, bow: 1 },            // Momo, the sleepy bunny (not pickable)
   ember: { k: 's', c: 0xff9a5c, blush: 0xff5a4a, crest: 'flame' },
   frost: { k: 's', c: 0xa9dcff, blush: 0x7fb6f0, crest: 'snow' },
   cloud: { k: 's', c: 0xf3f7ff, blush: 0xffb3c8, crest: 'puff' },
@@ -440,7 +548,7 @@ const CHARS = [
 ];
 const CHAR_IDS = CHARS.map(c => c[0]);
 function build(type) {
-  const K = KINDS[type], core = new THREE.Group(), hands = [], ears = [];
+  const K = KINDS[type], core = new THREE.Group(), hands = [], ears = []; let o_board = null;
   const eyeM = M(0x2d2140, .3), shine = new THREE.MeshBasicMaterial({ color: 0xffffff }), blush = M(K.blush || 0xff9ec0, .9);
   const eyes = (y, z, sp, cx, cy, cz, em) => {
     for (const s of [-1, 1]) {
@@ -453,12 +561,7 @@ function build(type) {
     mk(sph(.55, 32, 24), M(K.c, .25), [0, .48, 0], core).scale.set(1.05, .88, 1.05);
     eyes(.52, .55, .18, .32, .38, .47);
     mk(new THREE.TorusGeometry(.05, .014, 8, 16, Math.PI), eyeM, [0, .43, .56], core).rotation.z = Math.PI;
-    if (K.lids) for (const s of [-1, 1]) mk(sph(.098, 14, 10), M(K.c, .3), [s * .18, .565, .545], core).scale.set(1, .52, .8); // heavy sleepy lids
-    if (K.cap) { // Momo's floppy nightcap
-      const cap = mk(new THREE.ConeGeometry(.34, .7, 16), M(0x5b4b9a, .6), [.12, 1.12, 0], core); cap.rotation.z = -.55;
-      mk(sph(.1, 10, 8), M(0xfff5e0, .8), [.42, 1.38, 0], core);
-      mk(new THREE.TorusGeometry(.33, .05, 8, 24), M(0xfff5e0, .8), [0, .86, 0], core).rotation.x = Math.PI / 2;
-    } else if (K.ears) {
+    if (K.ears) {
       for (const s of [-1, 1]) { const e = mk(new THREE.ConeGeometry(.15, .32, 16), M(K.c, .4), [s * .3, .98, 0], core); e.rotation.z = -s * .35; }
     } else if (K.crest === 'flame') {
       [[-.14, .06, .2], [0, .0, .3], [.14, .06, .2]].forEach(([x, z, h], i) => mk(new THREE.ConeGeometry(.1, .3 + h, 8), new THREE.MeshStandardMaterial({ color: i === 1 ? 0xffd04a : 0xff7a2a, emissive: i === 1 ? 0xffb020 : 0xff5a10, emissiveIntensity: .8 }), [x, .98 + h * .3, z], core));
@@ -471,6 +574,26 @@ function build(type) {
       const leaf = mk(sph(.16, 12, 10), M(0x8fe08a), [.06, 1.0, 0], core);
       leaf.scale.set(1, .45, .6); leaf.rotation.z = -.5;
     }
+  } else if (K.k === 'p') { // Pip: neat and professional — suit, tie, round glasses, side-parted hair, clipboard
+    const skin = M(K.c, .45), suit = M(K.suit, .55), dark = M(0x4a3426, .6);
+    mk(sph(.5, 32, 24), skin, [0, .52, 0], core).scale.set(1, 1.02, .96);
+    mk(new THREE.CylinderGeometry(.47, .53, .44, 28), suit, [0, .26, 0], core);              // jacket
+    for (const s of [-1, 1]) mk(new THREE.ConeGeometry(.09, .16, 4), M(0xffffff, .5), [s * .09, .5, .44], core).rotation.set(-.35, 0, s * 2.4); // collar points
+    const tie = mk(new THREE.ConeGeometry(.065, .28, 4), M(K.tie, .5), [0, .34, .5], core); tie.rotation.x = Math.PI - .25;
+    mk(sph(.045, 8, 8), M(K.tie, .5), [0, .48, .47], core);                                   // knot
+    const hair = mk(new THREE.SphereGeometry(.515, 24, 12, 0, Math.PI * 2, 0, .82), dark, [0, .52, -.04], core); hair.rotation.set(-.18, 0, -.14); // neat side part
+    mk(sph(.12, 10, 8), dark, [.2, .98, .18], core).scale.set(1.4, .55, 1); // the swoop
+    eyes(.62, .45, .17, .3, .48, .45, K.glow ? new THREE.MeshStandardMaterial({ color: K.glow, emissive: K.glow, emissiveIntensity: 1.4 }) : null);
+    const rim = M(0x3a3330, .4);
+    for (const s of [-1, 1]) { const g = mk(new THREE.TorusGeometry(.115, .018, 8, 24), rim, [s * .17, .62, .5], core); g.rotation.y = s * .12; }
+    mk(new THREE.CylinderGeometry(.012, .012, .1, 6), rim, [0, .63, .52], core).rotation.z = Math.PI / 2; // bridge
+    mk(new THREE.TorusGeometry(.045, .012, 8, 16, Math.PI), M(0x6b3a3a, .5), [0, .47, .5], core).rotation.z = Math.PI;
+    for (const s of [-1, 1]) hands.push(mk(sph(.1, 14, 10), suit, [s * .52, .3, .12], core));
+    const board = new THREE.Group(); board.position.set(-.5, .36, .24); board.rotation.set(-.2, .5, .15); core.add(board); // clipboard in the left hand
+    mk(new THREE.BoxGeometry(.26, .34, .025), M(0x9a6b3d, .7), [0, 0, 0], board);
+    mk(new THREE.BoxGeometry(.21, .26, .01), M(0xffffff, .9), [0, -.02, .018], board);
+    mk(new THREE.BoxGeometry(.09, .04, .03), M(0xb0b4b8, .3), [0, .17, .02], board);
+    o_board = board;
   } else {
     const white = M(K.c, .35);
     mk(sph(.5, 32, 24), white, [0, .5, 0], core).scale.set(1.08, .92, 1.02);
@@ -486,7 +609,7 @@ function build(type) {
       hands.push(mk(sph(.1, 14, 10), white, [s * .5, .35, .12], core));
     }
   }
-  return { core, hands, ears };
+  return { core, hands, ears, board: o_board };
 }
 function makePlayer(type, name) {
   const o = { type, vy: 0, y: 0, land: 0, moving: false, mesh: new THREE.Group() };
@@ -547,7 +670,7 @@ function animate(o, dt, t) {
   o.vy -= 32 * dt; o.y += o.vy * dt;
   if (o.y <= 0) { if (o.vy < -4) o.land = .28; o.y = 0; o.vy = 0; }
   const air = o.y > .001, bot = KINDS[o.type].k === 'b';
-  const hop = !air && o.moving ? Math.abs(Math.sin(t * 10)) * (bot ? .08 : .22) : 0;
+  const hop = !air && o.moving ? Math.abs(Math.sin(t * 10)) * (bot ? .08 : KINDS[o.type].k === 'p' ? .1 : .22) : 0;
   o.land *= Math.exp(-dt * 9);
   o.sl = (o.sl || 0) + ((o.sleep ? 1 : 0) - (o.sl || 0)) * Math.min(1, dt * (o.type === 'momo' ? 1.6 : 2.6)); // Momo takes her time to flop down; Pip is quick and neat
   const sl = o.sl, momo = o.type === 'momo', pip = o.type === 'pip';
@@ -569,13 +692,14 @@ function animate(o, dt, t) {
   }
   o.core.position.set(cx, cy, 0); o.core.rotation.x = rx; o.core.rotation.z = rz;
   o.core.scale.set(1 / Math.sqrt(s), s, 1 / Math.sqrt(s));
-  o.hands.forEach((h, i) => { h.position.z = .12 + (o.moving ? Math.sin(t * 10 + i * Math.PI) * .15 : 0) + (pip ? -.1 * sl : 0); });
-  o.ears?.forEach(({ m, s: sd }) => { m.rotation.z = -sd * (.18 + (pip ? 1.0 : .5) * sl); m.rotation.x = sl * .5 + (pip ? Math.sin(t * 2.6) * .03 * sl : 0); }); // ears flop when asleep
+  o.hands.forEach((h, i) => { h.position.z = .12 + (o.moving ? Math.sin(t * 10 + i * Math.PI) * .15 : 0); });
+  o.ears?.forEach(({ m, s: sd }) => { m.rotation.z = -sd * (.18 + (momo ? 1.1 : .5) * sl); m.rotation.x = sl * .5 + (momo ? Math.sin(t * 1.0) * .05 * sl : 0); }); // ears flop when asleep (Momo's go completely limp)
+  if (o.board) o.board.rotation.x = -.2 + sl * .9; // Pip's clipboard sags onto his lap as he nods off
   if (sl > .001 || o.zs) sleepFx(o, t);
 }
 const tmp = new V();
 function place(o) {
-  tmp.copy(o.mesh.position); tmp.y += 1.7; tmp.project(camera);
+  tmp.copy(o.mesh.position); tmp.y += o.lh ?? 1.7; tmp.project(camera);
   const x = (tmp.x * .5 + .5) * innerWidth, y = (-tmp.y * .5 + .5) * innerHeight;
   for (const e of [o.n, o.b]) { e.style.display = tmp.z > 1 ? 'none' : 'block'; e.style.transform = `translate(${x}px,${y}px) translate(-50%,-100%)`; }
 }
@@ -591,7 +715,7 @@ const net = createNet({
   status: s => {
     if (s === 'connecting') { netBtn.innerHTML = '🌐<small>…</small>'; netBtn.title = 'Connecting…'; }
     else if (s === 'online') {
-      netBtn.innerHTML = '🌐<small>1</small>'; netBtn.classList.add('on');
+      netBtn.innerHTML = '🌐<small>1</small>'; netBtn.classList.add('on'); track('online');
       netBtn.title = `Online in room “${net.room}” (7 max) · tap to go offline`;
       if (netManual || !prefs.onlineSeen) { toast(prefs.onlineSeen ? `🌐 Online · room “${net.room}”` : '🌐 Online · others can see you · tap 🌐 in ⚙️ to go offline'); prefs.onlineSeen = true; savePrefs(); }
       else if (netBtn.dataset.was === 'retry') toast('🌐 Back online');
@@ -623,7 +747,20 @@ const netSay = v => { // public rooms carry emotes only; the first blocked sente
 // ---- Pip and Momo: world chat, personalities, weather-aware behaviour ----
 let state = 'intro', sel = CHAR_IDS.includes(prefs.avatar) ? prefs.avatar : 'slime', me, nextHop = 0, nearby = null, pondNear = false;
 const npcs = [];
-if (location.hash.includes('debug')) window.__island = { npcs, shelters, acorns, get me() { return me; } };
+// ---- pets: Miso the cat and Biscuit the duck (js/pets.js) ----
+const petLabel = name => { const n = Object.assign(document.createElement('div'), { className: 'name pet', textContent: name }), b = Object.assign(document.createElement('div'), { className: 'bubble' }); $('#labels').append(n, b); return { n, b, lh: .95 }; };
+const pets = createPets({ scene, obstacles, POND, label: petLabel, say: (p, m) => say(p, m, 2200), sound: (id, happy) => id === 'cat' ? sound.meow(happy) : sound.quack() });
+const petSpots = {
+  catBed: (() => { const lt = shelters.find(x => x.k === 'leanto'); if (!lt) return null; const q = loc(lt, 1.05, .25); return new V(q.x, 0, q.z); })(), // curled up next to Momo
+  shelterSpot: () => { const g = shelters.find(x => x.k === 'gazebo') || shelters[0]; if (!g) return null; const q = loc(g, 0, -.3); return new V(q.x, 0, q.z); },
+  fireSpot: fires[0] ? (() => { const f = fires[0], d = Math.hypot(f.x, f.z) || 1; return new V(f.x - f.x / d * .95, 0, f.z - f.z / d * .95); })() : null,
+};
+let petNear = null;
+function feedPet(p) {
+  const r = pets.interact(p);
+  track('pet'); if (r === 'fed') toast(`${p.id === 'cat' ? '🐱' : '🦆'} ${p.name} will follow you for a while`, '#e0a050');
+}
+if (location.hash.includes('debug')) window.__island = { feel, ambient, heartNow: () => { heartDone = false; heartWait = 0; }, pets, fishing, npcs, shelters, acorns, auroraM, sky, get me() { return me; }, get tour() { return tour; }, dbg: () => ({ nightMix, cloud: fx.cloud, fogN: fx.fogN, rain: fx.rain, snow: fx.snow, horror, skyW, skyEvt }) };
 const where = k => {
   const s = shelters.find(x => x.k === k); if (!s || !me) return '';
   const p = me.mesh.position, dx = s.cx - p.x, dz = s.cz - p.z, f = -dx * Math.sin(yaw) - dz * Math.cos(yaw), r = dx * Math.cos(yaw) - dz * Math.sin(yaw);
@@ -662,6 +799,11 @@ function npcTick(n, dt) {
     n.near = d < 2.8; return;
   }
   if (n.mode === 'listen') { o.moving = false; face(mp.x, mp.z); if ((n.hold -= dt) <= 0) n.mode = 'wander'; return; }
+  if (n.mode === 'tour') { // guiding: walk to the next stop, then turn to the visitor
+    const dx = n.goal.x - p.x, dz = n.goal.z - p.z;
+    if (Math.hypot(dx, dz) > .4) step(o, dx, dz, dt, 3.2); else { o.moving = false; face(mp.x, mp.z); }
+    return;
+  }
   // night: Pip and Momo go to bed in the lean-to (walk to its open front first, then step in so they never push through a post)
   const lt = shelters.find(x => x.k === 'leanto');
   if (lt && night && nightMix > .6 && horrorT < .5) {
@@ -698,7 +840,7 @@ function npcTick(n, dt) {
 // "@Pip what's the weather?" → Pip walks over, thinks, answers in a bubble (Momo too, in a different voice)
 async function converse(n, q) {
   if (!n) return;
-  if (n.busy) return say(n.o, n.who === 'pip' ? 'One sec! 🐰' : 'hold on...');
+  if (n.busy) return say(n.o, n.who === 'pip' ? 'One sec! 📋' : 'hold on...');
   const woke = n.o.sleep; if (woke) { n.o.sleep = false; n.bedStage = 0; }
   n.busy = true; n.mode = 'come'; n.near = false; say(n.o, woke ? (n.who === 'pip' ? 'Hm? Oh! One sec… 🥱' : 'five more minutes...') : '…', 9000);
   const t0 = performance.now();
@@ -732,8 +874,59 @@ document.querySelectorAll('.pick').forEach(b => b.onclick = () => {
 });
 if (net.relay && prefs.online !== false) $('#net-note').textContent = '🌐 Other visitors can see your buddy. Turn that off anytime with 🌐 in ⚙️.';
 if (prefs.avatar) { const c = CHARS.find(x => x[0] === prefs.avatar); if (!c) delete prefs.avatar; if (c) $('#again').textContent = `Welcome back · playing as ${c[1]} ${c[2]} (change in ☰)`; }
+// ---- guided tour: Pip walks you round the island in about a minute; your buddy follows unless you steer ----
+let tour = null, offerT = 0, doneT = 0;
+const pipNPC = () => npcs.find(x => x.who === 'pip');
+function tourStops() {
+  const B = stations[0], bf = { x: B.x, z: B.z + 2.3 };
+  const pd = Math.hypot(POND.x, POND.z) || 1, pond = { x: POND.x - POND.x / pd * (POND.r + 1.3), z: POND.z - POND.z / pd * (POND.r + 1.3) };
+  const lt = shelters.find(x => x.k === 'leanto') || shelters[0], sh = lt ? loc(lt, 0, 2.4) : { x: 0, z: 2 };
+  return [
+    { at: bf, say: "This board is the heart of the island: Erdian's projects on the left, ways to reach Erdian on the right. 🪧" },
+    ...PROJECTS.map(p => ({ at: bf, say: `${p.emoji} ${p.name}: ${p.desc}` })),
+    { at: bf, say: `Want to say hi? ${LINKS.map(l => l.label).join(', ')}: all on the board, and in ☰ anytime. ✉️` },
+    { at: pond, say: 'The pond, where Biscuit the duck lives! Stand close and press E (or tap Cast) to fish. Feed Biscuit or Miso the cat and they follow you around. 🎣' },
+    ...(lt ? [{ at: sh, say: 'When it rains or snows, shelter in here. Momo naps here at night. 🐰' }] : []),
+    { at: { x: 0, z: 1.5 }, say: got.size >= 5 ? 'You found all five golden acorns… so you know about the 👻. Brave!' : 'Psst… five golden acorns are hidden around the island. Find them all and… well, you will see. 🌰' },
+    { at: bf, say: "That's the tour! Type @Pip anytime to ask me things. Want to open the projects now? 📋", end: true },
+  ];
+}
+function startTour() {
+  const n = pipNPC(); if (!n || state !== 'play') return;
+  closePops(); if (panelOpen) closePanel();
+  offerT = 0; doneT = 0; prefs.toured = true; savePrefs();
+  tour = { stops: tourStops(), i: 0, phase: 'walk', w: 0, hold: 0, called: false }; track('tour_start');
+  n.o.sleep = false; n.mode = 'tour'; say(n.o, 'Follow me! 📋', 2200);
+  toast('🧭 Tour with Pip · steer anytime to look around, or Skip', '#7fb0d6');
+}
+function endTour(finished) {
+  const n = pipNPC(); tour = null; track(finished ? 'tour_done' : 'tour_skip');
+  if (n) { n.mode = 'wander'; n.t = rand(2, 4); }
+  if (finished) doneT = 10; else if (n) say(n.o, 'No problem! Ask me with @Pip anytime. 📋');
+}
+function tourTick(dt) {
+  if (offerT > 0) offerT -= dt; if (doneT > 0) doneT -= dt;
+  if (!tour) return;
+  const n = pipNPC(); if (!n) return endTour(false);
+  if (n.busy) return; // answering a question first
+  n.mode = 'tour'; n.o.sleep = false;
+  const st = tour.stops[tour.i], p = n.o.mesh.position, mp = me.mesh.position;
+  n.goal.set(st.at.x, 0, st.at.z);
+  if (tour.phase === 'walk') { if (Math.hypot(st.at.x - p.x, st.at.z - p.z) < .5) { tour.phase = 'wait'; tour.w = 0; } }
+  else if (tour.phase === 'wait') { // let the visitor catch up before talking
+    tour.w += dt;
+    if (Math.hypot(mp.x - p.x, mp.z - p.z) < 4.5 || tour.w > 10) { tour.phase = 'talk'; say(n.o, st.say, 60000); tour.hold = 2.4 + st.say.length * .055; sound.pop(); sr.textContent = `Pip: ${st.say}`; }
+    else if (tour.w > 4 && !tour.called) { tour.called = true; say(n.o, 'This way! 👋', 2000); }
+  } else if ((tour.hold -= dt) <= 0) {
+    if (st.end) return endTour(true);
+    tour.i++; tour.phase = 'walk'; tour.called = false;
+    if (tour.stops[tour.i].at !== st.at) n.o.b.classList.remove('on'); // walking on: clear the old line
+  }
+}
 function beginPlay() {
   state = 'play'; $('#pick').classList.add('hidden'); $('#hud').classList.remove('hidden'); $('#b-menu').classList.remove('hidden');
+  track('enter');
+  if (/(^|[-,&+#])shared($|[-,&+])/.test(location.hash.toLowerCase())) { track('shared_open'); setTimeout(() => toast('✨ Someone shared this moment with you', '#9a7fd6'), 1200); }
   prefs.avatar = sel; savePrefs(); if (location.hash.includes('projects')) setTimeout(() => openPanel(), 900);
   me.mesh.position.set(0, 0, 0); me.mesh.rotation.y = Math.PI;
   [['pip', 'pip', 'Pip'], ['momo', 'momo', 'Momo']].forEach(([t, who, name], i) => {
@@ -741,11 +934,17 @@ function beginPlay() {
     o.mesh.position.copy(q); npcs.push({ o, who, goal: q.clone(), t: rand(1, 4), mode: 'wander', hold: 0, busy: false, near: false });
     setTimeout(() => say(o, NPC_LINES[i]), 1500 + i * 1200);
   });
-  if (prefs.horrorUnlocked) { hb.classList.remove('hidden'); hb.classList.toggle('on', horrorT === 1); hb.setAttribute('aria-pressed', horrorT === 1); if (horrorT === 1) haunt(true); }
+  if (hauntOK()) { hb.classList.remove('hidden'); hb.classList.toggle('on', horrorT === 1); hb.setAttribute('aria-pressed', horrorT === 1); if (horrorT === 1) haunt(true); }
   if (net.relay && prefs.online !== false) goOnline(false); // online by default; a quiet failure just leaves 🌐 off
   { const c = CHARS.find(x => x[0] === sel); if (c) setTimeout(() => say(me, c[4]), 700); } // each buddy greets in its own voice
   if (coarse) toast('👈 left side moves · right side looks 👉', '#7fb0d6');
-  setTimeout(() => toast('💬 Tip: type @Pip or @Momo to talk to them', '#7fb0d6'), 2500);
+  if (!prefs.toured) setTimeout(() => { // first visit: Pip comes over and offers a short tour
+    const n = pipNPC(); if (!n || tour || state !== 'play') return;
+    prefs.toured = 'offered'; savePrefs(); offerT = 16;
+    n.mode = 'come'; say(n.o, "Hi! I'm Pip, the island guide. Want a quick tour? 📋", 16000);
+    setTimeout(() => { if (n.mode === 'come') { n.mode = 'listen'; n.hold = 10; } }, 3500);
+  }, 2200);
+  else setTimeout(() => toast('💬 Tip: type @Pip or @Momo to talk to them', '#7fb0d6'), 2500);
 }
 $('#go').onclick = () => {
   sound.start(); $('#intro').classList.add('hidden');
@@ -784,7 +983,8 @@ addEventListener('keydown', e => {
 addEventListener('keyup', e => keys.delete(e.key.toLowerCase()));
 addEventListener('blur', () => { keys.clear(); endStick(); look = null; });
 $('#jump').addEventListener('pointerdown', jump);
-$('#prompt').onclick = e => { act(); e.currentTarget.blur(); };
+const promptAct = () => tour ? endTour(false) : offerT > 0 ? startTour() : doneT > 0 ? (doneT = 0, open()) : act();
+$('#prompt').onclick = e => { promptAct(); e.currentTarget.blur(); };
 
 const joyEl = $('#joy'), knob = joyEl.firstElementChild, JR = 46;
 let stick = null, look = null, tap = null;
@@ -841,9 +1041,10 @@ canvas.addEventListener('wheel', e => { dist = clamp(dist + e.deltaY * .01, 5, 1
 addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
 
 // ---- loop ----
-let lastSk = '', stepT = 0, chipT = 0, envT = 0, driftT = rand(70, 130), strikeT = 3, boltT = 0, bolt2 = false, rbT = 0, wasRain = fx.rain > .3;
+let booted = false, ambT = rand(25, 60), lastSk = '', stepT = 0, chipT = 0, envT = 0, driftT = rand(70, 130), strikeT = 3, boltT = 0, bolt2 = false, rbT = 0, wasRain = fx.rain > .3;
 const thunders = [], tmpGrey = new THREE.Color();
 const clock = new THREE.Clock(), look3 = new V(0, 1, 0), pv = new V(), c1 = new THREE.Color();
+const skyTop = new THREE.Color(), skyHor = new THREE.Color(), skyBot = new THREE.Color(), NHOR = new THREE.Color(0x4a4a7a), SUNSETC = new THREE.Color(0xff9a50);
 const WHITE = new THREE.Color(0xffffff), DG = new THREE.Color(0x8f98a3), NG = new THREE.Color(0x1a1f30), WARMSKY = new THREE.Color(0xf4dba8), DRYG = new THREE.Color(0xb9b45e), DRYL = new THREE.Color(0xa8a23e), FLASHC = new THREE.Color(0xdfe8ff), CLOUDDARK = new THREE.Color(0x3d4350);
 const vis = y => clamp((y + 4) / 14, 0, 1);
 function strike() {
@@ -861,6 +1062,7 @@ renderer.setAnimationLoop(() => {
   for (const k in W) fx[k] += (W[k] - fx[k]) * a2;
   const raining = fx.rain > .3;
   if (wasRain && !raining && !night && !cold) rbT = 90; // rainbow after the rain
+  if (wasRain && !raining && state === 'play') ambient.boat({ ice: ice > .6 }); // …and a paper boat on the pond
   wasRain = raining;
   wet += ((fx.rain > .05 ? 1 : 0) - wet) * (1 - Math.exp(-dt * (fx.rain > .05 ? .25 : .03)));
   snowCover += ((fx.snow > .1 ? .95 : 0) - snowCover) * (1 - Math.exp(-dt * (fx.snow > .1 ? .05 : cold ? .004 : .05)));
@@ -869,7 +1071,8 @@ renderer.setAnimationLoop(() => {
   horror += (horrorT - horror) * (1 - Math.exp(-dt * .9));
   if (Math.abs(horrorT - horror) < .003) horror = horrorT;
   phase += (phaseT - phase) * (1 - Math.exp(-dt * 1.6));
-  const auroraT = nightMix > .6 && cold && fx.cloud < .4 && fx.rain < .05 && fx.snow < .05 && fx.fogN > 30 ? 1 : 0;
+  skyTick(dt);
+  const auroraT = nightMix > .6 && (cold || skyEvt === 'aurora') && fx.cloud < .4 && fx.rain < .05 && fx.snow < .05 && fx.fogN > 30 ? 1 : 0;
   aurora += (auroraT - aurora) * a2;
   flash = Math.max(0, flash - dt * 4.5);
 
@@ -888,9 +1091,19 @@ renderer.setAnimationLoop(() => {
   cur.hi += (T.hi - cur.hi) * a; cur.si += (T.si - cur.si) * a;
   bg.copy(cur.sky); if (flash > 0) bg.lerp(FLASHC, Math.min(flash, 1) * .7);
   if (horror > 0) bg.lerp(HBG, horror * .92);
-  scene.background = bg; scene.fog.color.copy(bg); scene.fog.near = fx.fogN + (Math.min(fx.fogN, 5) - fx.fogN) * horror; scene.fog.far = fx.fogF + (Math.min(fx.fogF, 34) - fx.fogF) * horror;
+  scene.background = bg; scene.fog.near = fx.fogN + (Math.min(fx.fogN, 5) - fx.fogN) * horror; scene.fog.far = fx.fogF + (Math.min(fx.fogF, 34) - fx.fogF) * horror;
   hemi.color.copy(cur.hs); hemi.groundColor.copy(cur.hg); hemi.intensity = cur.hi * (.45 + .55 * fx.lit) * (1 - horror * .55) + flash * 2.2;
   sun.color.copy(cur.sun); sun.intensity = cur.si * fx.lit * (1 - horror * .6) + flash * 1.5;
+  { // the sky dome: a soft gradient from the palette, then special skies on top; fog takes the horizon colour so the island melts into it
+    const free = 1 - horror;
+    skyTop.copy(bg).multiplyScalar(.8 + .1 * nightMix); skyHor.copy(bg).lerp(WHITE, .25 * (1 - nightMix) * (1 - fx.gloom)).lerp(NHOR, .25 * nightMix * (1 - fx.gloom)); skyBot.copy(skyHor).multiplyScalar(.85);
+    for (const k in skyW) { const w = skyW[k] * free; if (w < .002) continue; const E = SKY[k];
+      skyTop.lerp(E.top, w); skyHor.lerp(E.hor, w); skyBot.lerp(E.bot, w);
+      hemi.color.lerp(E.hs, w * .6); hemi.groundColor.lerp(E.hg, w * .5);
+      if (E.sun) sun.color.lerp(E.sun, w * .8); }
+    if (flash > 0) { skyTop.lerp(FLASHC, Math.min(flash, 1) * .6); skyHor.lerp(FLASHC, Math.min(flash, 1) * .6); }
+    scene.fog.color.copy(skyHor).lerp(bg, clamp((40 - fx.fogN) / 30, 0, 1)); // thick fog: keep the plain fog colour
+  }
   if (horror > 0) { hemi.color.lerp(HHEM, horror * .7); hemi.groundColor.lerp(HGND, horror * .7); sun.color.lerp(HSUN, horror * .8); }
   grassM.userData.base.copy(cur.grass).lerp(DRYG, fx.heat * .55).multiplyScalar(1 - wet * .22); grassM.roughness = .9 - wet * .35;
   dirtM.userData.base.copy(cur.dirt).multiplyScalar(1 - wet * .25);
@@ -899,17 +1112,23 @@ renderer.setAnimationLoop(() => {
   for (const m of PR.SNOWY) m.color.copy(m.userData.base).lerp(WHITE, snowCover * m.userData.k);
   waterM.color.copy(cur.water).lerp(DG, fx.gloom * .3);
   cloudM.color.copy(cur.cloud).lerp(CLOUDDARK, fx.gloom * .75 * (1 - nightMix * .5));
+  if (skyW.sunset > .002) { const w = skyW.sunset * (1 - horror); waterM.color.lerp(SKY.sunset.water, w * .6); cloudM.color.lerp(SKY.sunset.cloud, w * .8); }
   if (horror > 0) { for (const m of PR.SNOWY) m.color.lerp(HCOL, horror * .6); waterM.color.lerp(HWATER, horror * .8); cloudM.color.lerp(HCLOUD, horror * .8); }
 
   // sky bodies hide behind cloud
   sunS.position.set(Math.cos(phase) * 40, Math.sin(phase) * 70, -70);
   moonS.position.set(Math.cos(phase + Math.PI) * 40, Math.sin(phase + Math.PI) * 70, -70);
   sunS.material.opacity = vis(sunS.position.y) * (1 - fx.cloud * .8) * (1 - (wx === 'fog') * .5); moonS.material.opacity = vis(moonS.position.y) * (1 - fx.cloud * .7);
-  sunS.material.color.copy(cur.sun).lerp(HRED, horror * .85); moonS.material.color.copy(cur.sun).lerp(HRED, horror * .85);
-  starM.opacity = nightMix * .9 * (1 - fx.cloud * .9);
+  sunS.material.color.copy(cur.sun).lerp(SUNSETC, skyW.sunset).lerp(HRED, horror * .85); moonS.material.color.copy(cur.sun).lerp(HRED, horror * .85);
+  sunS.scale.setScalar(46 * (1 + skyW.sunset * .45));
+  const clearSky = 1 - fx.cloud * .9, starBoost = (skyW.meteors + skyW.cosmic + skyW.aurora) * (1 - horror);
+  starM.opacity = nightMix * clearSky * (.9 + starBoost * .1); starM.size = 1.8 + starBoost * .5;
+  cstarM.opacity = nightMix * clearSky * Math.min(1, skyW.cosmic * 1 + skyW.meteors * .45 + skyW.aurora * .3) * (1 - horror); cstars.rotation.y += dt * .004 * skyW.cosmic;
+  sky.update({ cam: camera, t, dt, top: skyTop, horizon: skyHor, bottom: skyBot, sunDir: sunS.position, glow: skyW.sunset * (1 - horror), sunCol: SUNSETC, cosmic: skyW.cosmic * nightMix * (1 - horror) * clearSky,
+    rate: nightMix > .6 && fx.cloud < .5 && fx.rain < .05 && fx.snow < .05 && fx.fogN > 30 && horror < .5 ? .08 + skyW.meteors * 2.4 : 0 });
   sun.position.copy(sunS.position).lerp(moonS.position, nightMix).normalize();
   sun.position.y = Math.max(sun.position.y, .35); sun.position.normalize().multiplyScalar(24);
-  auroraM.material.opacity = aurora * (.55 + .15 * Math.sin(t * .7)); auroraM.visible = aurora > .01;
+  auroraM.material.opacity = aurora * (.55 + .15 * Math.sin(t * .7)) * (1 + skyW.aurora * .45); auroraM.visible = aurora > .01;
   if (auroraM.visible) {
     auroraTex.offset.x = t * .006;
     for (let i = 0; i < aPos.count; i++) { const top = i < 41, x = aBase[i * 3]; aPos.setY(i, aBase[i * 3 + 1] + (top ? Math.sin(x * .13 + t * .6) * 2.4 + Math.sin(x * .31 - t * .9) * 1 : Math.sin(x * .2 - t * .4) * .7)); }
@@ -923,8 +1142,16 @@ renderer.setAnimationLoop(() => {
   pMat.color.lerp(c1.set(horror > .4 ? 0xff3a2a : mode === 0 ? 0xffffff : mode === 1 ? 0xc9b23a : 0xffe27a), a);
   pMat.size += ((mode === 0 ? .16 : mode === 1 ? .28 : .22) - pMat.size) * a;
   pMat.opacity += ((mode === 0 ? .5 + .45 * snowA : mode === 1 ? .85 : mode === 2 ? 1 : 0) - pMat.opacity) * a;
+  if (!night) { heartDone = false; heartWait = rand(25, 70); }
+  else if (mode === 2 && flyA && horror < .3 && !heartDone && state === 'play' && (heartWait -= dt) <= 0) { // once a night the fireflies draw a heart over the pond
+    heartDone = true; heartT = 11; hR.setFromMatrixColumn(camera.matrixWorld, 0); hR.y = 0; hR.normalize();
+    for (let i = 0; i < HEART; i++) { const s = i / HEART * 6.283, x = 16 * Math.sin(s) ** 3, y = 13 * Math.cos(s) - 5 * Math.cos(2 * s) - 2 * Math.cos(3 * s) - Math.cos(4 * s); heartTo[i * 3] = POND.x + hR.x * x * .11; heartTo[i * 3 + 1] = 3.4 + y * .11; heartTo[i * 3 + 2] = POND.z + hR.z * x * .11; }
+    if (me && Math.hypot(me.mesh.position.x - POND.x, me.mesh.position.z - POND.z) < 14) setTimeout(() => { const n = npcs.find(x => !x.o.sleep && x.mode !== 'tour'); if (n) say(n.o, n.who === 'pip' ? 'Did you see that?! 💛' : 'the bugs are in love. cute.'); }, 2500);
+  }
+  if (heartT > 0) heartT -= dt;
   for (let i = 0; i < N; i++) {
     const j = i * 3;
+    if (heartT > 0 && i < HEART && mode === 2) { const k = Math.min(1, dt * (heartT > 2 ? 1.6 : .3)); pa[j] += (heartTo[j] - pa[j]) * k; pa[j + 1] += (heartTo[j + 1] + Math.sin(t * 3 + i) * .03 - pa[j + 1]) * k; pa[j + 2] += (heartTo[j + 2] - pa[j + 2]) * k; continue; }
     if (mode === 0) { pa[j + 1] -= (1.2 + snowA * 1.3) * dt; pa[j] += (Math.sin(t + seed[i]) * .4 + WD.x * wv * 3) * dt; pa[j + 2] += WD.z * wv * 3 * dt; if (pa[j + 1] < 0) pa[j + 1] = 14; }
     else if (mode === 1) { pa[j] += (WD.x * (4 + wv * 7) + Math.sin(t * 3 + seed[i]) * .8) * dt; pa[j + 2] += WD.z * (4 + wv * 7) * dt; pa[j + 1] = clamp(pa[j + 1] + Math.sin(t * 2 + seed[i]) * 1.4 * dt - .25 * dt, .4, 9); }
     else { pa[j + 1] = clamp(pa[j + 1] + Math.sin(t * .7 + seed[i]) * .25 * dt, .4, 5); pa[j] += (Math.cos(t * .5 + seed[i]) * .3 + WD.x * wv * 2) * dt; pa[j + 2] += WD.z * wv * 2 * dt; }
@@ -972,6 +1199,14 @@ renderer.setAnimationLoop(() => {
     fireLight.intensity = lit * (1 + nightMix * 2.4 + fx.gloom * 1.3 + (cold ? .8 : 0)) * (.9 + .1 * Math.sin(t * 13));
     if (state === 'play' && lit > .3 && Math.hypot(me.mesh.position.x - f.x, me.mesh.position.z - f.z) < 3.2) warmth = true;
   }
+  { // footprints, leaves, puddle glints, breath
+    const wk = [], kick = [];
+    if (me && state !== 'intro') { wk.push({ o: me, h: .55 }); if (me.moving) kick.push(me.mesh.position); }
+    for (const n of npcs) { wk.push({ o: n.o, h: .6 }); if (n.o.moving) kick.push(n.o.mesh.position); }
+    for (const p of pets.list) wk.push({ o: p, small: true, h: .3 });
+    for (const o of net.list()) wk.push({ o, h: .55 });
+    feel.tick(dt, t, { walkers: wk, kick, snow: snowCover, wet, ice: ice > .6, wind: wv, WD, leafA, lampOn, cold: cold && !warmth && horror < .5, sheltered, rain: fx.rain, snowing: snowA });
+  }
   const rip = clamp(fx.rain * 1.4, 0, 1);
   PR.MATS.puddle.opacity = clamp(wet * .6, 0, .6) * (1 - snowCover);
   for (const [i, g] of puddles.entries()) { const r = g.userData.ripple, u = (t * .9 + i * .37) % 1; r.scale.setScalar(g.userData.s * (.15 + u * .7)); r.material.opacity = (1 - u) * .55 * rip; }
@@ -990,8 +1225,15 @@ renderer.setAnimationLoop(() => {
   }
 
   for (const s of shelters) { // roofs turn see-through when the camera is close or you stand under them
-    const d = Math.hypot(camera.position.x - s.cx, camera.position.y - 1.5, camera.position.z - s.cz), under = me && Math.hypot(me.mesh.position.x - s.cx, me.mesh.position.z - s.cz) < s.r + .4;
-    s.fade += ((under ? .22 : clamp((d - 3) / 5, .15, 1)) - s.fade) * (1 - Math.exp(-dt * 6));
+    let tgt = 1;
+    if (me && state === 'play') {
+      const P = me.mesh.position, C = camera.position, under = Math.hypot(P.x - s.cx, P.z - s.cz) < s.r + .4;
+      // distance from the shelter to the camera→you line (ground plane): it only fades when it is in the way
+      const vx = P.x - C.x, vz = P.z - C.z, L2 = vx * vx + vz * vz || 1, u = clamp(((s.cx - C.x) * vx + (s.cz - C.z) * vz) / L2, 0, 1);
+      const off = Math.hypot(C.x + vx * u - s.cx, C.z + vz * u - s.cz), camD = Math.hypot(C.x - s.cx, C.z - s.cz);
+      tgt = under ? .22 : camD < s.r + 2 ? clamp((camD - s.r) / 4, .18, .6) : off < s.r + .6 && u < .98 ? .35 : 1; // right next to the camera it would fill the screen
+    }
+    s.fade += (tgt - s.fade) * (1 - Math.exp(-dt * 6));
     for (const m of s.mats) { m.opacity = s.fade; m.depthWrite = s.fade > .85; }
   }
   let tp, tl;
@@ -1010,7 +1252,8 @@ renderer.setAnimationLoop(() => {
     const inShelter = sheltered(p.x, p.z);
     shel += ((inShelter ? 1 : 0) - shel) * (1 - Math.exp(-dt * 6));
     step(me, ix * cy - iz * sy, -ix * sy - iz * cy, dt, 5 * fx.spd * (1 - snowCover * .1));
-    if (wv > .5 && !inShelter && !panelOpen) { const push = (wv - .45) * 2.2; p.x += WD.x * push * dt; p.z += WD.z * push * dt; resolve(me); } // gusts shove you, roofs stop them
+    tourTick(dt);
+    if (tour && !lock && Math.hypot(ix, iz) < .05) { const q = pipNPC()?.o.mesh.position; if (q && Math.hypot(q.x - p.x, q.z - p.z) > 2.6) step(me, q.x - p.x, q.z - p.z, dt, 4.4 * fx.spd); } // tag along    if (wv > .5 && !inShelter && !panelOpen) { const push = (wv - .45) * 2.2; p.x += WD.x * push * dt; p.z += WD.z * push * dt; resolve(me); } // gusts shove you, roofs stop them
     const dd = dist * (camera.aspect < 1 ? Math.min(1.55, 1 + (1 - camera.aspect) * .9) : 1); // portrait phones see less sideways, so pull back
     tp = [p.x + sy * cp * dd, Math.sin(pitch) * dd + 1, p.z + cy * cp * dd]; tl = [p.x, 1.1, p.z];
 
@@ -1018,10 +1261,14 @@ renderer.setAnimationLoop(() => {
     let best = 3.3; // distance to the board's face, not its centre: it is wide
     for (const s of stations) { const d = Math.hypot(Math.max(0, Math.abs(p.x - s.x) - s.hw), p.z - s.z); if (d < best) { best = d; nearby = s; } }
     const pr = $('#prompt');
-    pondNear = !nearby && Math.hypot(p.x - POND.x, p.z - POND.z) < POND.r + 1.8;
+    petNear = !nearby ? pets.near(p) : null;
+    pondNear = !nearby && !petNear && Math.hypot(p.x - POND.x, p.z - POND.z) < POND.r + 1.8;
     if (!pondNear && fishing.active()) fishing.cancel();
-    pr.classList.toggle('hidden', !(nearby || pondNear) || panelOpen);
-    if (nearby) pr.textContent = `${nearby.emoji} Open ${nearby.label}${coarse ? '' : ' · E'}`;
+    const special = tour ? '⏭ Skip tour' : offerT > 0 ? '🧭 Yes, show me around' : doneT > 0 ? '🪧 Open the projects' : '';
+    pr.classList.toggle('hidden', !(special || nearby || petNear || pondNear) || panelOpen);
+    if (special) pr.textContent = special;
+    else if (nearby) pr.textContent = `${nearby.emoji} Open ${nearby.label}${coarse ? '' : ' · E'}`;
+    else if (petNear) pr.textContent = pets.label(petNear) + (coarse ? '' : ' · E');
     else if (pondNear) pr.textContent = fishing.label() + (coarse ? '' : ' · E');
     fishing.setCond({
       bite: fx.fish * (night ? 1.1 : 1), luck: 1 + fx.rain * .6 + nightMix * .25 + aurora * 1.2, swim: cold ? .5 : 1,
@@ -1032,9 +1279,11 @@ renderer.setAnimationLoop(() => {
     if (auto && !live && (driftT -= dt) <= 0) { driftT = rand(70, 140); setWeather(nextWx(wx, cold)); }
     if ((chipT -= dt) <= 0) {
       chipT = .4;
-      const aur = aurora > .5, icon = aur ? '🌌' : wx === 'clear' && night ? '🌙' : WX_ICON[wx], name = aur ? 'Aurora' : WX_NAME[wx];
+      const ev = skyEvt && skyW[skyEvt] > .5 ? SKY[skyEvt] : null, aur = !ev && aurora > .5;
+      const icon = ev ? ev.icon : aur ? '🌌' : wx === 'clear' && night ? '🌙' : WX_ICON[wx], name = ev ? ev.name : aur ? 'Aurora' : WX_NAME[wx];
       const bad = fx.rain > .2 || snowA > .2 || fx.wind > .6 || fx.heat > .5;
-      const s = (horror > .5 ? `🕯️ Haunted · ${currentTemp()}°` : `${icon} ${name} · ${currentTemp()}°${inShelter && bad ? ' · 🏠 Sheltered' : ''}${warmth && cold ? ' · 🔥 Warm' : ''}`) + (net.on() && netBtn.classList.contains('on') ? ` · 🌐 ${net.list().length + 1}` : '');
+      const s = (horror > .5 ? `🕯️ Haunted · ${currentTemp()}°` : `${icon} ${name} · ${currentTemp()}°${inShelter && bad ? ' · 🏠 Sheltered' : ''}${warmth && cold ? ' · 🔥 Warm' : ''}`) + (net.on() && netBtn.classList.contains('on') ? ` · 🌐 ${net.list().length + 1}` : '') + (got.size && got.size < 5 ? ` · 🌰 ${got.size}/5` : '');
+      document.body.classList.toggle('haunted', horror > .5);
       if (s !== lastChip) $('#wx').textContent = lastChip = s;
     }
   }
@@ -1046,8 +1295,23 @@ renderer.setAnimationLoop(() => {
 
   worldFx(dt, t); horrorFx(dt, t); fishing.update(dt, t);
   net.tick(dt, me, state === 'play');
+  { const momo = npcs.find(n => n.who === 'momo');
+    pets.tick(dt, t, { me: state === 'play' ? me : null, night: nightMix > .6, rain: fx.rain, ice: ice > .6, horror, ...petSpots,
+      fly: mode === 2 && flyA && horror < .3 ? () => { for (let k = 0; k < 6; k++) { const i = Math.floor(Math.random() * N); if (Math.hypot(pa[i * 3], pa[i * 3 + 2]) < 11) return { x: pa[i * 3], z: pa[i * 3 + 2] }; } return null; } : null,
+      momo: momo && fx.rain > .2 && momo.mode === 'wander' ? momo.o.mesh.position : null, bobber: fishing.bobber(), casts: fishing.casts(),
+      lookUp: (skyEvt && skyW[skyEvt] > .5 && SKY[skyEvt].night) || ambient.busy.balloon }); }
+  ambient.tick(dt, t, { me: me && state === 'play' ? me.mesh.position : null, horror: horror > .5, rain: fx.rain > .2, ice: ice > .6 });
+  if (state === 'play' && (ambT -= dt) <= 0) { // now and then: a balloon drifts by, or birds come to sit on the board roof
+    ambT = rand(45, 110);
+    const c = { day: nightMix < .3, clear: fx.cloud < .6 && fx.rain < .1 && fx.snow < .2 && fx.fogN > 25, wind: fx.wind, horror: horror > .5, me: me.mesh.position };
+    if (Math.random() < .45 ? ambient.tryBalloon(c) : ambient.tryBirds(c)) {
+      if (ambient.busy.balloon) setTimeout(() => { const n = npcs.find(x => x.mode === 'wander' && !x.o.sleep); if (n) say(n.o, n.who === 'pip' ? 'Look up, a hot-air balloon! 🎈' : 'balloon. i want a ride.'); }, 4000);
+    }
+  }
+  for (const o of pets.list) if (state !== 'intro') place(o);
   for (const o of [me, ...npcs.map(n => n.o), ...net.list()]) if (o) { animate(o, dt, t); if (state !== 'intro') place(o); }
   renderer.render(scene, camera);
+  if (!booted) { booted = true; requestAnimationFrame(() => { document.body.classList.add('ready'); const g = $('#go'); g.disabled = false; g.textContent = 'Come on in'; }); } // first frame is on screen
   if (snap) { snap = false; takePhoto(); }
 });
 // haunted mode: vignette, the Watcher, heartbeat, creaks
@@ -1081,22 +1345,21 @@ function horrorFx(dt, t) {
   if (!reduce) vigEl.style.opacity = (horror * (.7 + near * .25 + .05 * Math.sin(t * 5))).toFixed(2);
 }
 const hb = $('#b-horror');
-function haunt(on) { // Pip's eyes turn red; the island does the rest
-  KINDS.pip.glow = on ? 0xff2a2a : 0xff7fb0;
-  const n = npcs.find(x => x.who === 'pip'); if (n) setType(n.o, 'pip');
+function haunt(on) { // Pip's and Momo's eyes turn red; the island does the rest
+  KINDS.momo.glow = on ? 0xff2a2a : 0xff7fb0; KINDS.pip.glow = on ? 0xff2a2a : undefined; // both buddies' eyes go red
+  for (const n of npcs) setType(n.o, n.o.type);
 }
 function setHorror(on, quiet) {
+  if (on) track('haunt');
   horrorT = on ? 1 : 0; prefs.horrorOn = on; savePrefs(); haunt(on);
   hb.classList.toggle('on', on); hb.classList.remove('pulse'); hb.title = on ? 'Make the island peaceful again' : 'Haunt the island'; hb.setAttribute('aria-pressed', on);
   if (!quiet) toast(on ? '🕯️ The island feels… different' : '☀️ The island is peaceful again', on ? '#c0392b' : undefined);
   if (!on) st.dist = 11;
 }
-press('#b-horror', () => setHorror(!prefs.horrorOn));
+press('#b-horror', () => hauntOK() && setHorror(!prefs.horrorOn));
 function worldFx(dt, t) {
   rbT = Math.max(0, rbT - dt);
   const ro = clamp(rbT / 8, 0, 1) * .5; rb.children.forEach(r => r.material.opacity = ro);
-  if (mt < 0 && night && fx.cloud < .5 && fx.rain < .05 && fx.snow < .05 && fx.fogN > 30 && Math.random() < dt * .12) { mt = 0; meteor.position.set(rand(-30, 40), rand(40, 60), -80); mv.set(-70, -28, 0); }
-  if (mt >= 0) { mt += dt; meteor.position.addScaledVector(mv, dt); meteor.material.opacity = Math.sin(Math.PI * Math.min(mt, 1)); if (mt > 1) { mt = -1; meteor.material.opacity = 0; } }
   if (state !== 'play') return;
   acorns.forEach((g, i) => {
     g.rotation.y += dt * 2; g.position.y = .5 + Math.sin(t * 2.5 + i) * .1;
@@ -1104,7 +1367,7 @@ function worldFx(dt, t) {
       g.visible = false; got.add(i); ls.set('island.acorns', JSON.stringify({ k: acornKey, ids: [...got] }));
       sound.chime(); toast(`🌰 Golden acorn ${got.size}/5`, '#f0b030');
       if (got.size === 5) { // no crown: the fifth acorn wakes something on the island
-        prefs.horrorUnlocked = true; savePrefs(); hb.classList.remove('hidden'); hb.classList.add('pulse');
+        hb.classList.remove('hidden'); hb.classList.add('pulse');
         toast('🌰 All five found… the sky feels wrong', '#f0b030');
         setTimeout(() => { sound.creak(); toast('👻 Something stirs… a ghost button appeared (top right). Press it if you dare.', '#c0392b'); }, 1600); // unlocked, not started: you choose when
       }

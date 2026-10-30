@@ -33,8 +33,6 @@ h2{font-size:1.4rem;margin-bottom:1rem}
 #mood{position:fixed;top:var(--top);right:1rem;display:flex;gap:.5rem;z-index:40}
 .pop{position:fixed;top:calc(var(--top) + 3.4rem);right:1rem;z-index:40;background:rgba(251,247,238,.94);backdrop-filter:blur(10px);border:3px solid #fff;border-radius:24px;padding:.6rem;box-shadow:0 6px 0 rgba(60,110,90,.3);transition:opacity .2s,visibility .2s,transform .2s;transform-origin:top right}
 .pop.hidden{transform:scale(.92)}
-#drawer{display:grid;grid-template-columns:repeat(4,2.7rem);gap:.45rem}
-.strip{grid-column:1/-1;display:grid;grid-template-columns:repeat(4,2.7rem);gap:.45rem;padding:.45rem 0;border-block:2px dashed rgba(60,110,90,.25);margin-block:.1rem}
 #menu{display:grid;gap:.4rem;min-width:13rem}
 #menu button,#links a{font:inherit;font-weight:800;font-size:.9rem;color:var(--ink);background:#fff;border:0;border-radius:99px;padding:.6rem 1rem;text-align:left;text-decoration:none;cursor:pointer;box-shadow:0 3px 0 rgba(60,110,90,.25);transition:transform .15s}
 #menu button:hover,#links a:hover{transform:translateY(-2px)}
@@ -110,8 +108,6 @@ h2{font-size:1.4rem;margin-bottom:1rem}
 #ai-smart{display:grid;gap:.6rem}#ai-smart.hidden{display:none}
 .row{display:flex;gap:.6rem;margin-top:1rem;flex-wrap:wrap}
 #story-msg{margin-top:.6rem;font-size:.85rem;font-weight:700}
-#toasts{position:fixed;top:5rem;left:50%;transform:translateX(-50%);z-index:45;display:grid;gap:.4rem;pointer-events:none;justify-items:center;width:max-content;max-width:92vw}
-.toast{background:#fff;border:3px solid;border-radius:18px;padding:.5rem 1rem;font-weight:800;font-size:.9rem;box-shadow:0 4px 0 rgba(60,110,90,.25);animation:pop .4s cubic-bezier(.34,1.56,.64,1)}
 #dex-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(8rem,1fr));gap:.6rem}
 .dexn{grid-column:1/-1;font-size:.8rem;opacity:.7}
 .fc{background:#fff;border-radius:18px;padding:.7rem;border:3px solid var(--rc);text-align:center;font-weight:800;font-size:.85rem}
@@ -121,7 +117,6 @@ h2{font-size:1.4rem;margin-bottom:1rem}
 #fb-list{display:grid;gap:.6rem;max-width:30rem;margin:1.5rem auto}
 #fb-list a{background:#fff;border-radius:18px;padding:.8rem 1rem;text-decoration:none;color:var(--ink);font-weight:700;box-shadow:0 3px 0 rgba(60,110,90,.25)}
 #vig{position:fixed;inset:0;z-index:9;pointer-events:none;opacity:0;background:radial-gradient(ellipse at center,transparent 36%,rgba(48,0,8,.5) 70%,rgba(8,0,2,.92) 100%)}
-#b-horror.on{border-color:#c0392b;background:#3a1a22;box-shadow:0 0 14px rgba(200,40,40,.6)}
 @keyframes beat{50%{transform:scale(1.22)}}
 .ico.pulse{animation:beat 1.1s 4}
 @media (prefers-reduced-motion:reduce){.ico.pulse{animation:none}}
@@ -133,3 +128,54 @@ h2{font-size:1.4rem;margin-bottom:1rem}
 .pick b{font-size:1.9rem}
 .pick:hover,.pick.on{transform:scale(1.04)}
 @media (max-width:480px){.picks{grid-template-columns:repeat(2,minmax(0,1fr))}.pick small{font-size:.68rem}}
+
+/* ---------- HUD v2: one shared surface, labelled settings, calmer toasts ---------- */
+:root{--glass:rgba(255,253,248,.9);--glass-ink:var(--ink);--edge:rgba(255,255,255,.95);--drop:0 2px 0 rgba(60,110,90,.28),0 10px 24px rgba(40,70,60,.14);--muted:rgba(47,74,58,.62)}
+.ico,#wx,.pop,.toast{background:var(--glass);color:var(--glass-ink);box-shadow:var(--drop);transition:background .6s,color .6s,transform .15s,border-color .15s}
+.ico{border:2px solid var(--edge);position:relative}
+.ico.on{border-color:var(--leaf);background:#eef7ea}
+.ico small{position:absolute;top:-.35rem;right:-.35rem;min-width:1.15rem;height:1.15rem;padding:0 .25rem;border-radius:99px;background:var(--leaf);color:#fff;font-size:.62rem;line-height:1.15rem;margin:0}
+#wx{border:2px solid var(--edge);padding:.45rem .95rem;font-size:.82rem;letter-spacing:.01em}
+
+/* settings: labelled tiles in three groups */
+.pop{border:2px solid var(--edge);border-radius:22px;padding:.7rem;max-height:calc(100dvh - var(--top) - 4.5rem);overflow-y:auto}
+#drawer{display:grid;grid-template-columns:repeat(4,4.1rem);gap:.4rem}
+#drawer .grp{grid-column:1/-1;font-size:.66rem;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);padding:.35rem .2rem 0}
+#drawer .grp:first-child{padding-top:0}
+.strip{grid-column:1/-1;display:grid;grid-template-columns:repeat(4,4.1rem);gap:.4rem}
+#drawer .ico{width:4.1rem;height:auto;min-height:3.6rem;border-radius:16px;align-content:center;gap:.22rem;font-size:1.25rem;box-shadow:0 2px 0 rgba(60,110,90,.18)}
+#drawer .ico::after{content:attr(data-l);font-size:.62rem;font-weight:800;color:var(--muted);white-space:nowrap}
+#drawer .ico:hover{transform:translateY(-1px)}
+@media (max-width:380px){#drawer,.strip{grid-template-columns:repeat(4,3.6rem)}#drawer .ico{width:3.6rem}}
+
+/* toasts: icon chip + text, slide in, fade out */
+#toasts{position:fixed;top:calc(var(--top) + 3.6rem);left:50%;transform:translateX(-50%);z-index:45;display:grid;gap:.4rem;pointer-events:none;justify-items:center;width:max-content;max-width:min(92vw,30rem)}
+.toast{display:flex;align-items:center;gap:.6rem;border:2px solid var(--edge);border-radius:16px;padding:.4rem .9rem .4rem .4rem;font-weight:700;font-size:.86rem;line-height:1.35;animation:tin .35s cubic-bezier(.34,1.56,.64,1)}
+.toast b{flex:none;display:grid;place-items:center;width:1.9rem;height:1.9rem;border-radius:11px;font-size:1.05rem;background:color-mix(in srgb,var(--c) 22%,transparent)}
+.toast.out{opacity:0;transform:translateY(-6px);transition:opacity .3s,transform .3s}
+@keyframes tin{from{opacity:0;transform:translateY(-10px) scale(.96)}}
+
+/* haunted: the whole HUD dims and turns ember-red */
+body.haunted{--glass:rgba(28,12,18,.86);--glass-ink:#f1d9d9;--edge:rgba(160,40,50,.45);--drop:0 2px 0 rgba(0,0,0,.5),0 10px 26px rgba(80,0,10,.35);--muted:rgba(241,217,217,.6)}
+body.haunted .ico.on{background:#4a1a24;border-color:#c0392b}
+body.haunted .name{background:rgba(28,12,18,.8);color:#f1d9d9}
+body.haunted .bubble{background:#2a1218;color:#f6dede;box-shadow:0 3px 0 rgba(120,20,30,.6)}
+#b-horror.on{border-color:#c0392b;background:#3a1a22;color:#fff;box-shadow:0 0 0 2px rgba(192,57,43,.35),0 0 18px rgba(200,40,40,.55)}
+
+/* ---------- first impression: an instant drawn island while the 3D one loads ---------- */
+html{background:linear-gradient(#8ecdf0,#cfe9f7 70%,#e9f4ea)}
+html.nite{background:linear-gradient(#1b1d3a,#2b2a4a 60%,#3a3560)}
+html body{background:transparent}
+#boot{position:fixed;inset:0;z-index:5;display:grid;place-items:center;pointer-events:none;transition:opacity .9s .1s,visibility .9s .1s}
+#boot .isle{width:min(78vw,620px);margin-top:18vh;animation:bob 4s ease-in-out infinite}
+#boot .top{fill:#8fcf6b}#boot .side{fill:#c79a6b}#boot .rock{fill:#8a6a4a}#boot .trees{fill:#4f9a45}#boot .sign{fill:#b9824f}
+.nite #boot .top{fill:#4f7a47}.nite #boot .side{fill:#6b5340}.nite #boot .rock{fill:#4a3a2e}.nite #boot .trees{fill:#2f5a35}.nite #boot .sign{fill:#6b4a30}
+body.ready #boot{opacity:0;visibility:hidden}
+#webgl{opacity:0;transition:opacity .8s}
+body.ready #webgl{opacity:1}
+@keyframes bob{50%{transform:translateY(-8px)}}
+#go[disabled]{cursor:progress;background:linear-gradient(90deg,#7fb98a 0%,#a8d5b0 50%,#7fb98a 100%) 0 0/200% 100%;animation:shimmer 1.4s linear infinite;box-shadow:0 5px 0 #6a9a73}
+@keyframes shimmer{to{background-position:-200% 0}}
+@media (prefers-reduced-motion:reduce){#boot .isle,#go[disabled]{animation:none}}
+body:not(.ready) #mood{opacity:0;pointer-events:none}
+.name.pet{font-size:.62rem;opacity:.85}

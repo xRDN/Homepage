@@ -5,10 +5,25 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Erdian · little island</title>
 <meta name="description" content="A tiny walkable island with my links and projects.">
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js" crossorigin>
+<link rel="modulepreload" href="./js/main.js"><link rel="modulepreload" href="./js/props.js"><link rel="modulepreload" href="./js/layout.js"><link rel="modulepreload" href="./js/sky.js"><link rel="modulepreload" href="./js/pets.js"><link rel="modulepreload" href="./js/ambient.js"><link rel="modulepreload" href="./js/feel.js">
+<link rel="modulepreload" href="./js/weather.js"><link rel="modulepreload" href="./js/sound.js"><link rel="modulepreload" href="./js/ai.js"><link rel="modulepreload" href="./js/fish.js"><link rel="modulepreload" href="./js/net.js"><link rel="modulepreload" href="./js/config.js">
+<script>(h => { if (h < 6 || h >= 19) document.documentElement.classList.add('nite'); })(new Date().getHours())</script>
 <link rel="stylesheet" href="./css/style.css">
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js"}}</script>
 </head>
 <body>
+<!-- shown instantly while the 3D island loads; fades out once the first frame is drawn -->
+<div id="boot" aria-hidden="true">
+  <svg viewBox="0 0 400 240" class="isle">
+    <ellipse cx="200" cy="150" rx="150" ry="42" class="top"/>
+    <path d="M50 150 Q200 300 350 150 Q200 205 50 150Z" class="rock"/>
+    <path d="M50 150 Q200 205 350 150 L350 162 Q200 218 50 162Z" class="side"/>
+    <g class="trees"><circle cx="120" cy="118" r="20"/><circle cx="142" cy="128" r="14"/><path d="M265 140 l16-46 16 46z"/><path d="M290 146 l12-34 12 34z"/><circle cx="215" cy="122" r="12"/></g>
+    <rect x="178" y="108" width="44" height="26" rx="3" class="sign"/>
+  </svg>
+</div>
 <canvas id="webgl" aria-label="A small 3D island you can walk around"></canvas>
 <div id="labels"></div>
 <div id="vig" aria-hidden="true"></div>
@@ -22,23 +37,30 @@
 <nav id="menu" class="pop hidden" aria-label="Menu">
   <div id="links"></div>
   <button id="nav-proj">🪧 Projects &amp; links</button>
+  <button id="nav-tour">🧭 Tour with Pip</button>
   <button id="nav-fish">🐟 Fish collection</button>
   <button id="nav-chars">🎭 Change buddy</button>
   <button id="nav-story">📖 Story</button>
 </nav>
 <div id="drawer" class="pop hidden" role="group" aria-label="Settings">
-  <button id="b-tod" class="ico"></button>
-  <button id="b-temp" class="ico"></button>
-  <button id="b-auto" class="ico" title="Auto weather: the sky changes by itself" aria-label="Auto weather">🎲</button>
-  <button id="b-live" class="ico" title="Match your real local weather" aria-label="Real weather near you">📍</button>
+  <p class="grp">Sky</p>
+  <button id="b-tod" class="ico" data-l="Day"></button>
+  <button id="b-temp" class="ico" data-l="Warm"></button>
+  <button id="b-auto" class="ico" data-l="Drift" title="Auto weather: the sky changes by itself" aria-label="Auto weather">🎲</button>
+  <button id="b-live" class="ico" data-l="Real" title="Match your real local weather" aria-label="Real weather near you">📍</button>
+  <button id="b-sky" class="ico" data-l="Skies" aria-label="Special skies">✨</button>
+  <p class="grp">Weather</p>
   <div id="wxs" class="strip"></div>
-  <button id="b-net" class="ico" title="Peer-to-peer: other visitors can see your IP address" aria-label="Go online">🌐</button>
-  <button id="b-snd" class="ico" title="Sound on / off" aria-label="Sound">🔊</button>
-  <button id="b-photo" class="ico" title="Take a postcard" aria-label="Postcard">📸</button>
-  <button id="b-lite" class="ico" title="Lighter graphics for slow devices" aria-label="Lite mode">🪶</button>
-  <button id="b-chatstay" class="ico" aria-label="Keep chat open after sending">📌</button>
-  <button id="b-brain" class="ico" title="Smarter Pip and Momo (optional on-device model)" aria-label="Smart buddies">🧠</button>
-  <button id="b-shuffle" class="ico" title="Re-roll the island layout" aria-label="Re-roll the island layout">🔀</button>
+  <p class="grp">Island</p>
+  <button id="b-net" class="ico" data-l="Online" title="Peer-to-peer: other visitors can see your IP address" aria-label="Go online">🌐</button>
+  <button id="b-snd" class="ico" data-l="Sound" title="Sound on / off" aria-label="Sound">🔊</button>
+  <button id="b-photo" class="ico" data-l="Photo" title="Take a postcard" aria-label="Postcard">📸</button>
+  <button id="b-share" class="ico" data-l="Share" title="Copy a link to this exact moment (time, weather, sky)" aria-label="Share this moment">🔗</button>
+  <button id="b-lite" class="ico" data-l="Lite" title="Lighter graphics for slow devices" aria-label="Lite mode">🪶</button>
+  <button id="b-chatstay" class="ico" data-l="Pin chat" aria-label="Keep chat open after sending">📌</button>
+  <button id="b-stats" class="ico" data-l="Stats on" aria-label="Anonymous stats">📊</button>
+  <button id="b-brain" class="ico" data-l="Smart" title="Smarter Pip and Momo (optional on-device model)" aria-label="Smart buddies">🧠</button>
+  <button id="b-shuffle" class="ico" data-l="Re-roll" title="Re-roll the island layout" aria-label="Re-roll the island layout">🔀</button>
 </div>
 <div id="toasts" aria-live="polite"></div>
 <main id="fallback" hidden><h1>Erdian's little island</h1><p>Your browser can't run the 3D island, so here's the short version.</p><div id="fb-list"></div></main>
@@ -48,7 +70,7 @@
     <p class="eyebrow">welcome to</p>
     <h1>Erdian's<br>little island</h1>
     <p class="sub">My links, my projects, a few friends, and room to wander.</p>
-    <button id="go" class="btn">Come on in</button>
+    <button id="go" class="btn" disabled>Loading island…</button>
     <p id="again" class="again"></p>
     <p id="net-note" class="again"></p>
   </div>
@@ -114,7 +136,7 @@
   <div class="sheet">
     <button class="x" aria-label="Close">✕</button>
     <h2 id="atitle">🧠 Smart buddies</h2>
-    <p class="sub">Pip 🐰 and Momo 🍡 answer when you type <b>@Pip</b> or <b>@Momo</b> in the world. Quick mode needs no download. Smart mode runs a small language model on your device, each buddy in their own voice.</p>
+    <p class="sub">Pip 📋 and Momo 🐰 answer when you type <b>@Pip</b> or <b>@Momo</b> in the world. Quick mode needs no download. Smart mode runs a small language model on your device, each buddy in their own voice.</p>
     <div class="seg"><button id="ai-t-quick" class="on">⚡ Quick · 0 MB</button><button id="ai-t-smart">🧠 Smart · download</button></div>
     <div id="ai-smart" class="hidden">
       <select id="ai-model" aria-label="Model"></select>
@@ -126,5 +148,6 @@
 </aside>
 
 <script type="module" src="./js/main.js"></script>
+<script>setTimeout(() => { if (document.body.classList.contains('ready')) return; const g = document.getElementById('go'); if (!g) return; g.disabled = false; g.textContent = 'Still loading… tap to retry'; g.onclick = () => location.reload(); }, 20000)</script>
 </body>
 </html>

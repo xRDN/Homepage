@@ -17,7 +17,7 @@ A tiny walkable 3D homepage (Three.js, no build step, no server). Works on GitHu
 ## Talk to Pip and Momo
 
 Type `@Pip` or `@Momo` (or tap them) in the chat. They walk over and answer in a speech bubble, each in their own voice:
-Pip 🐰 is the upbeat, precise guide (projects, links, controls, tips); Momo 🍡 is the sleepy, deadpan one (naps, rain, vibes, sends you to Pip for details). Both know the live weather, where the shelters are, your acorn count and the fishing odds. `@everyone` asks both.
+Pip 📋 is the upbeat, precise guide (glasses, tie, clipboard) (projects, links, controls, tips); Momo 🐰 is the sleepy, deadpan bunny (naps, rain, vibes, sends you to Pip for details). Both know the live weather, where the shelters are, your acorn count and the fishing odds. `@everyone` asks both.
 Quick mode needs no download. The 🧠 icon in settings loads an optional on-device model (desktop + WebGPU) so they answer with it, each with their own persona.
 
 ## The island
@@ -27,9 +27,28 @@ Quick mode needs no download. The 🧠 icon in settings loads an optional on-dev
 - **Shelters:** a gazebo and a lean-to with a campfire by the pond. Under a roof rain and snow are cut off, wind can't push you, sound is muffled and the weather chip says 🏠 Sheltered. Pip and Momo run for cover when it gets rough (Momo stays out in light rain to stomp puddles).
 - **Weather (8 kinds)** in ⚙️: clear, cloudy, windy, rain, storm, snow, fog, heatwave. 🎲 lets it drift by itself (on by default), 📍 follows your real local weather. Each one changes: sky, light and fog; clouds (count, speed, darkness); rain streaks, snow, blown leaves; tree sway, flowers closing, windmill speed; wet ground and puddles, snow cover, a freezing pond (no fishing on ice), a drying pond and grass in a heatwave; walking speed and wind gusts; lightning, thunder and camera shake in storms (flash is tiny with reduced motion); lamps and campfire; sound (wind, rain, snow, thunder, cicadas); fishing bite rate and rare-fish odds; an aurora on clear cold nights; a rainbow after rain.
 - Fishing at the pond: N / R / SR / SSR fish (60 / 28 / 10 / 2 % base, better in rain, at night and under an aurora). Ice or a storm blocks fishing.
-- Five golden acorns are hidden around the island. Found acorns are remembered per island (re-rolling the island resets them). Find all five and a 👻 button appears top right; it does nothing until you press it. Then the island turns haunted (red fog, a lurking figure, nervous buddies, low drone), and your choice is remembered. It never jump-scares and has no fast flashing.
-- Six buddies to play as (Blobby, Mochi, Bunbot, Ember, Frost, Puff), each with its own look, tagline and greeting. Pip 🐰 and Momo 🍡 have looks of their own that nobody can pick, and other visitors can't appear as them either.
-- At night Pip and Momo go to sleep in the lean-to (💤). Pip dozes sitting up, nodding off with drooping ears; Momo flops onto her side and breathes slowly. Talk to them and they wake up; they stay awake when the island is haunted.
+- Five golden acorns are hidden around the island. Found acorns are remembered per island (re-rolling the island resets them). Find all five and a 👻 button appears top right; it does nothing until you press it. The button exists only while all five acorns of the current island are found (re-rolling hides it again). Then the island turns haunted (red fog, a lurking figure, nervous buddies, low drone), and your choice is remembered. It never jump-scares and has no fast flashing.
+- Six buddies to play as (Blobby, Mochi, Bunbot, Ember, Frost, Puff), each with its own look, tagline and greeting. Pip 📋 and Momo 🐰 have looks of their own that nobody can pick, and other visitors can't appear as them either.
+- At night Pip and Momo go to sleep in the lean-to (💤). Pip dozes sitting up, nodding off as his clipboard sags; Momo flops onto her side, ears gone limp, and breathes slowly. Talk to them and they wake up; they stay awake when the island is haunted.
+
+## Special skies and the tour
+
+- **Special skies:** now and then the sky does something rare: a 🌇 sunset (the sun sinks low, everything turns gold), a ☄️ meteor shower, a 🪐 cosmic night (nebula, milky way, a ringed planet) or the 🌌 aurora. The ✨ tile in ⚙️ → Sky picks one directly, turns them off, or leaves them to chance. Deep links work too: `#sunset`, `#night-meteors`, `#night-cosmic`, `#night-aurora`.
+- **Pets:** Miso the cat 🐱 and Biscuit the duck 🦆. Walk up and press E (or tap the button) to feed one, and it follows you for a couple of minutes; press again to pet it. Miso naps in the sun, hides from rain in the gazebo and sleeps by the campfire at night. Biscuit swims and dabbles in the pond, loves rain, waddles on the ice when it freezes and tucks its head in at night. In haunted mode both stick close to you with red eyes. Pets are per visitor, like the weather.
+- **Pets in the world:** at nightfall Miso often hunts fireflies (pouncing!) before curling up next to sleeping Momo; Miso comes running when you land a fish; Biscuit paddles over to inspect your bobber and splashes after Momo in the rain; the two greet each other when they meet; both look up at balloons and special night skies.
+- **Little moments:** a hot-air balloon drifts past on calm days, birds land on the board roof (and fly off when you come close), a paper boat sails the pond when rain stops, and once a night the fireflies draw a heart over the pond.
+- **Weather you can feel:** footprints in snow and mud (yours, the buddies', paw prints) that slowly fill back in; leaves pile up in strong wind and scatter when you walk through; lamps glint in the puddles on wet nights; breath puffs in the cold (not by the fire).
+- **🔗 Share** (⚙️ → Island) copies a link that opens the island with the same time, weather and special sky (on phones it opens the share sheet). Whoever opens it gets a little "someone shared this moment" note.
+- **Tour with Pip:** on a first visit Pip offers a one-minute walk: the board, each project, how to reach you, the pond, the shelter and a hint about the acorns. Your buddy follows him (steer anytime to look around), and it ends by offering to open the projects. Replay it from ☰ → 🧭 Tour with Pip.
+- **Loading:** a drawn island and the welcome card appear instantly; "Come on in" turns on as soon as the 3D island has drawn its first frame. Scripts are preloaded in parallel. On a very slow connection the button offers a retry after 20 seconds.
+
+## Anonymous stats (optional)
+
+The relay can keep simple daily counters so you can see what people actually use: visits (new / returning), "Come on in", board opens, which project and contact links get clicked, tour started / finished / skipped, pets fed, fish caught, shares, special skies picked, going online.
+
+- **Private by design:** only `+1` on a (day, event) pair. No cookies, no visitor IDs, no IP addresses or browser details are stored. Visitors with Do Not Track or Global Privacy Control are never counted, and anyone can switch it off with 📊 in ⚙️.
+- **Turn on the dashboard:** in the Cloudflare dashboard open Workers & Pages → `island-relay` → Settings → Variables and Secrets → add a **Secret** named `STATS_KEY` with a long random value (or run `npx wrangler secret put STATS_KEY`). Then open `https://island-relay.YOUR-NAME.workers.dev/stats?key=THAT_VALUE` (add `&days=90` or `&format=json` if you like). Without the key the page stays locked.
+- Counting works as soon as the new relay is deployed; the key only unlocks reading.
 
 ## Meeting other visitors (multiplayer)
 

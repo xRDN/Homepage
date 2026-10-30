@@ -67,6 +67,8 @@ export const sound = {
   horror(v) { hv = v; if (horG) horG.gain.setTargetAtTime(v * .06, ctx.currentTime, 1.2); },
   creak() { blip(120, 1.2, .05, 62, 'sawtooth'); blip(2300, .06, .008, 1700, 'square', .05); },
   heartbeat(p = .5) { blip(62, .13, .07 + p * .1, 38, 'sine'); blip(54, .15, .05 + p * .08, 34, 'sine', .2); },
+  meow(happy) { blip(happy ? 520 : 600, .32, .045, happy ? 700 : 820, 'triangle'); blip(happy ? 700 : 820, .25, .035, happy ? 480 : 560, 'triangle', .22); },
+  quack() { blip(420, .12, .05, 300, 'square'); blip(390, .12, .045, 280, 'square', .16); },
   splash: () => blip(260, .25, .05, 70, 'triangle'),
   step: (soft, wet) => wet ? blip(520, .07, .03, 190, 'triangle') : blip(soft ? 220 : 150, .05, soft ? .02 : .05, 60, 'triangle'),
   jump: () => blip(300, .15, .05, 650),
