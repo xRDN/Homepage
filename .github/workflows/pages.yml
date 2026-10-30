@@ -9,13 +9,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with: { node-version: 20 }
-      - name: Build story mode into ./story
-        working-directory: story-src
-        run: npm install && npm run build
-      - name: Assemble site
-        run: mkdir _site && cp -r index.html css js story _site/
+      - name: Assemble site (no build step needed)
+        run: mkdir _site && cp -r index.html sw.js css js story _site/
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with: { path: _site }
