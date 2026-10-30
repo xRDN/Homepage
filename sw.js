@@ -3,7 +3,7 @@
 // - versioned CDN files (three.js): cache first, they never change
 // - other CDN files (multiplayer, optional on-device model runtime): stale while revalidate
 // Weather requests, peer-to-peer traffic and model weights are never touched.
-const VERSION = 'island-v13';
+const VERSION = 'island-v2';
 const SHELL = ['./', './index.html', './css/style.css', './js/main.js', './js/layout.js', './js/weather.js', './js/props.js', './js/sound.js', './js/ai.js', './js/fish.js', './js/net.js', './js/config.js', './js/sky.js', './js/pets.js', './js/ambient.js', './js/feel.js'];
 const THREE = 'https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js';
 
