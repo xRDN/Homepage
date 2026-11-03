@@ -1,4 +1,4 @@
-# Erdian's little island
+# 3D Portofolio Site
 
 A tiny walkable 3D homepage (Three.js, no build step, no server). Works on GitHub Pages as-is.
 
